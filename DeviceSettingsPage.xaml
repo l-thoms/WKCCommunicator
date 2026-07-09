@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="WkcCommunicator.DeviceSettingsPage"
+             xmlns:controls="clr-namespace:WkcCommunicator.Controls"
+			 xmlns:res="clr-namespace:WkcCommunicator.Resources"
+             Loaded="ContentPage_Loaded">
+	<Grid>
+		<VerticalStackLayout VerticalOptions="Center">
+			<controls:DisconnectedSign x:Name="DeviceSettingsDisconnectedSign" IsVisible="Visible"/>
+		</VerticalStackLayout>
+
+		<ScrollView x:Name="DeviceSettingsView" IsVisible="Hidden">
+			<VerticalStackLayout Spacing="16">
+				<Border Margin="24, 0" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
+					<Border.StrokeShape>
+						<RoundRectangle CornerRadius="12"/>
+					</Border.StrokeShape>
+					<VerticalStackLayout Spacing="12">
+						<Label Text="{x:Static res:AppResources.DeviceSettingsPage_BasicInfo}" FontSize="Large" Margin="4"/>
+						<Grid>
+							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_DeviceName}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
+							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
+								<Entry x:Name="DeviceNameEntry" MaxLength="30" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+							</Grid>
+						</Grid>
+						<Grid>
+							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Owner}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
+							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
+								<Entry x:Name="OwnerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+							</Grid>
+						</Grid>
+						<Grid>
+							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Character}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
+							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
+								<Entry x:Name="CharacterEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+							</Grid>
+						</Grid>
+						<Grid>
+							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Manufacturer}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
+							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
+								<Entry x:Name="ManufacturerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+							</Grid>
+						</Grid>
+						<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Warning}" FontAttributes="Italic"/>
+					</VerticalStackLayout>
+				</Border>
+				<!--TODO: Table for custom quick settings-->
+				<Border Margin="24, 0" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
+					<Border.StrokeShape>
+						<RoundRectangle CornerRadius="12"/>
+					</Border.StrokeShape>
+					<VerticalStackLayout Spacing="12">
+						<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Connection}" FontSize="Large" Margin="4"/>
+						<controls:UnaccentedButton Text="{x:Static res:AppResources.DeviceSettingsPage_Disconnect}" Clicked="DisconnectButton_Clicked"/>
+						<Button TextColor="White" BackgroundColor="#d92e24" Text="{x:Static res:AppResources.DeviceSettingsPage_DeleteDevice}" Clicked="DeleteDeviceButton_Clicked"/>
+					</VerticalStackLayout>
+				</Border>
+			</VerticalStackLayout>
+		</ScrollView>
+	</Grid>
+</ContentPage>

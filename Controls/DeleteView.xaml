@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="WkcCommunicator.Controls.DeleteView"
+			 xmlns:controls="clr-namespace:WkcCommunicator.Controls"
+			 xmlns:res="clr-namespace:WkcCommunicator.Resources">
+	<Grid Padding="24" Background="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+		<VerticalStackLayout VerticalOptions="Center" Spacing="24">
+			<Label HorizontalOptions="Center" Text="{x:Static res:AppResources.DeleteView_Warning}" Style="{StaticResource LabelLighter}" FontSize="Medium"/>
+			<HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+				<controls:UnaccentedButton Text="{x:Static res:AppResources.DeleteView_Cancel}" Padding="0, 0" HorizontalOptions="Center" WidthRequest="120" Clicked="CancelButton_Clicked"/>
+				<Button Text="{x:Static res:AppResources.DeleteView_Delete}" TextColor="White" BackgroundColor="#d92e24"  Padding="0, 0" HorizontalOptions="Center" WidthRequest="120" Clicked="DeleteButton_Clicked"/>
+			</HorizontalStackLayout>
+		</VerticalStackLayout>
+    </Grid>
+</ContentView>

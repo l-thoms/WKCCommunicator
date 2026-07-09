@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="WkcCommunicator.Controls.DeviceLabel"
+			 xmlns:controls="clr-namespace:WkcCommunicator.Controls"
+			 xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+			 xmlns:res="clr-namespace:WkcCommunicator.Resources">
+	<Grid>
+		<controls:UnaccentedButton CornerRadius="0" Background="Transparent" Clicked="UnaccentedButton_Clicked">
+			<controls:UnaccentedButton.Behaviors>
+				<toolkit:TouchBehavior LongPressDuration="400" LongPressCompleted="TouchBehavior_LongPressCompleted"/>
+			</controls:UnaccentedButton.Behaviors>
+		</controls:UnaccentedButton>
+		<Grid HeightRequest="120" RowDefinitions="*" ColumnDefinitions="90, *">
+			<Grid Grid.Column="0">
+				<Image x:Name="SignalBackground" Opacity="0.2" HeightRequest="60" WidthRequest="60"/>
+				<Image x:Name="SignalIndicator" Opacity="0.6" HeightRequest="60" WidthRequest="60"/>
+			</Grid>
+			<Grid HorizontalOptions="Fill" Grid.Column="1" RowDefinitions="1.2*, 3*" Margin="0, 6">
+				<Label x:Name="NameLabel" Text="{x:Static res:AppResources.DeviceLabel_UnnamedDevice}" FontSize="Medium" Grid.Row="0"/>
+				<Grid RowDefinitions="*, *, *" ColumnDefinitions="*, *" HorizontalOptions="Fill" Grid.Row="1">
+					<FlexLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Owner}" Style="{StaticResource LabelLighter}" MaxLines="1" FlexLayout.Shrink="0"/>
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelOwner" FlexLayout.Grow="1"
+						LineBreakMode="TailTruncation" MaxLines="1"/>
+					</FlexLayout>
+					<FlexLayout Grid.Row="0" Grid.Column="1"  HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Character}" Style="{StaticResource LabelLighter}" MaxLines="1" FlexLayout.Shrink="0"/>
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelCharacter" FlexLayout.Grow="1"
+						LineBreakMode="TailTruncation" MaxLines="1"/>
+					</FlexLayout>
+					<FlexLayout Grid.Row="1" Grid.Column="0"  HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Manufacturer}" Style="{StaticResource LabelLighter}" MaxLines="1" FlexLayout.Shrink="0"/>
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelManufacturer" FlexLayout.Grow="1"
+						LineBreakMode="TailTruncation" MaxLines="1"/>
+					</FlexLayout>
+					<FlexLayout Grid.Row="1" Grid.Column="1"  HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_ProtocolVersion}" Style="{StaticResource LabelLighter}" MaxLines="1" FlexLayout.Shrink="0"/>
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelProtocolVersion" FlexLayout.Grow="1"
+						LineBreakMode="NoWrap" MaxLines="1"/>
+					</FlexLayout>
+					<FlexLayout Grid.Row="2" Grid.Column="0"  HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Model}" Style="{StaticResource LabelLighter}" MaxLines="1" FlexLayout.Shrink="0"/>
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelModel" FlexLayout.Grow="1"
+						LineBreakMode="TailTruncation" MaxLines="1"/>
+					</FlexLayout>
+					<FlexLayout Grid.Row="2" Grid.Column="1"  HorizontalOptions="Fill">
+						<Label Text="{x:Static res:AppResources.DeviceLabel_Unknown}" Style="{StaticResource LabelLighter}" x:Name="LabelAddress" FlexLayout.Grow="1"
+						LineBreakMode="TailTruncation" MaxLines="1"/>
+					</FlexLayout>
+				</Grid>
+			</Grid>
+		</Grid>
+	</Grid>
+</ContentView>

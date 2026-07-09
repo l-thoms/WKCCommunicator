@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="WkcCommunicator.MyDevicePage"
+             xmlns:controls="clr-namespace:WkcCommunicator.Controls"
+			 xmlns:res="clr-namespace:WkcCommunicator.Resources"
+             Loaded="ContentPage_Loaded">
+	<Grid>
+		<VerticalStackLayout VerticalOptions="Center">
+			<controls:DisconnectedSign x:Name="MyDeviceDisconnectedSign" IsVisible="Visible"/>
+		</VerticalStackLayout>
+
+		<ScrollView x:Name="MyDeviceView" IsVisible="Hidden">
+			<VerticalStackLayout Spacing="16">
+				<Border Margin="24, 0" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
+					<Border.StrokeShape>
+						<RoundRectangle CornerRadius="12"/>
+					</Border.StrokeShape>
+					<VerticalStackLayout Spacing="12">
+						<Label Text="{x:Static res:AppResources.MyDevicePage_Keys}" FontSize="Large" Margin="4"/>
+						<Grid ColumnDefinitions="80, 80, 80" RowDefinitions="80, 80, 80" RowSpacing="16" ColumnSpacing="16" HorizontalOptions="Center" Margin="0,0,0,12">
+							<Grid  Grid.Column="1" Grid.Row="0">
+								<controls:UnaccentedButton x:Name="KeyUpButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_up.png, Dark=keyboard_arrow_up_dark.png}" HeightRequest="60"/>
+							</Grid>
+							<Grid  Grid.Column="0" Grid.Row="1">
+								<controls:UnaccentedButton x:Name="KeyLeftButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_Left.png, Dark=keyboard_arrow_Left_dark.png}" HeightRequest="60"/>
+							</Grid>
+							<Grid  Grid.Column="2" Grid.Row="1">
+								<controls:UnaccentedButton x:Name="KeyRightButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_right.png, Dark=keyboard_arrow_up_right_dark.png}" HeightRequest="60"/>
+							</Grid>
+							<Grid  Grid.Column="1" Grid.Row="2">
+								<controls:UnaccentedButton x:Name="KeyDownButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_down.png, Dark=keyboard_arrow_up_down_dark.png}" HeightRequest="60"/>
+							</Grid>
+
+
+							<Grid  Grid.Column="1" Grid.Row="1">
+								<controls:UnaccentedButton x:Name="KeyOkButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=circle.png, Dark=circle_dark.png}" HeightRequest="40"/>
+							</Grid>
+							<Grid  Grid.Column="0" Grid.Row="2">
+								<controls:UnaccentedButton x:Name="KeyMenuButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=menu.png, Dark=menu_dark.png}" HeightRequest="40"/>
+							</Grid>
+							<Grid  Grid.Column="2" Grid.Row="2">
+								<controls:UnaccentedButton x:Name="KeyBackButton" Clicked="KeyButton_Clicked"/>
+								<Image Source="{AppThemeBinding Light=arrow_back.png, Dark=arrow_back_dark.png}" HeightRequest="40"/>
+							</Grid>
+						</Grid>
+					</VerticalStackLayout>
+				</Border>
+				<!--TODO: Table for custom quick commands-->
+			</VerticalStackLayout>
+		</ScrollView>
+	</Grid>
+</ContentPage>
