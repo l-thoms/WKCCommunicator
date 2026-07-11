@@ -4,7 +4,7 @@
              x:Class="WkcCommunicator.Controls.PairingView"
 			 xmlns:controls="clr-namespace:WkcCommunicator.Controls" Loaded="ContentView_Loaded"
 			 xmlns:res="clr-namespace:WkcCommunicator.Resources">
-	<Grid Padding="24 24 0 24" Background="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+	<Grid Padding="24,24,24,0" Background="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
 		<VerticalStackLayout VerticalOptions="Center" Spacing="6">
 			<Label HorizontalOptions="Center" Text="{x:Static res:AppResources.PairingView_InputPassKey}" Style="{StaticResource LabelLighter}" FontSize="Medium"/>
 			<HorizontalStackLayout HorizontalOptions="Center">

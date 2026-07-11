@@ -27,7 +27,7 @@
 		<ApplicationId>com.companyname.wkccommunicator</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>0.0.0.1</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
@@ -41,14 +41,28 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 		<NeutralLanguage>en-US</NeutralLanguage>
     <UseMaterial3>true</UseMaterial3>
+    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+    <Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
 	  <EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
+	  <ApplicationVersion>1</ApplicationVersion>
+	  <ApplicationDisplayVersion>0.0.0.1</ApplicationDisplayVersion>
+	  <AndroidKeyStore>False</AndroidKeyStore>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
 	  <AndroidPackageFormat>apk</AndroidPackageFormat>
+	  <EnableLLVM>True</EnableLLVM>
+	  <ApplicationVersion>1</ApplicationVersion>
+	  <ApplicationDisplayVersion>0.0.0.1</ApplicationDisplayVersion>
+	  <AndroidKeyStore>False</AndroidKeyStore>
+	  <PublishTrimmed>True</PublishTrimmed>
+	  <RunAOTCompilation>False</RunAOTCompilation>
+	  <AndroidLinkTool>r8</AndroidLinkTool>
+    <AndroidLinkMode>SdkOnly</AndroidLinkMode>
+    <TrimMode>partial</TrimMode>
 	</PropertyGroup>
 
 	<ItemGroup>
