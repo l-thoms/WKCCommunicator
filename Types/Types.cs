@@ -20,6 +20,17 @@ namespace WkcCommunicator.Types
 		WriteSettings
 	}
 
+	public enum TableItemType
+	{
+		Action,
+		Switch,
+		Integer,
+		Decimal,
+		Picker,
+		String,
+		Unknown
+	}
+
 	public class WkcDeviceInfo
 	{
 		public string? Name { get; set; }
@@ -33,18 +44,29 @@ namespace WkcCommunicator.Types
 		public string? Key { get; set; }
 	}
 
-	public struct WkcDeviceInfoRaw
+	public class TableItem
 	{
-		public string? owner;
-		public string? character;
-		public string? manufacturer;
+		public TableItemType Type { get; set; }
+		public string? Name { get; set; }
+		public string? DisplayName { get; set; }
+		public double Min { get; set; }
+		public double Max { get; set; }
+		public double NumberValue { get; set; }
+		public string[]? Options { get; set; }
+		public int StringLength { get; set; }
+		public string? StringValue { get; set; }
+		public bool BoolValue { get; set; }
 	}
 
-	public struct WkcSettingsRaw
+	public class TableGroup
 	{
-		public int advertise_duration;
-		public bool display_rotated;
-		public int brightness;
-		public int power_save;
+		public string? Name { get; set; }
+		public TableItem[]? Items { get; set; }
+	}
+
+	public enum TableGroupType
+	{
+		Shortcut,
+		Settings
 	}
 }

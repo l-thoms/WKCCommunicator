@@ -205,7 +205,7 @@
     <value>The next version of the protocol will stop reading settings entries directly from advertise data and will read the settings table from the characteristic instead.</value>
   </data>
   <data name="DeviceSettingsPage_BasicInfo" xml:space="preserve">
-    <value>Basic Information</value>
+    <value>Legacy Settings</value>
   </data>
   <data name="DeviceSettingsPage_DeviceName" xml:space="preserve">
     <value>Device Name</value>
@@ -239,5 +239,14 @@
   </data>
   <data name="DeleteView_Delete" xml:space="preserve">
     <value>Delete</value>
+  </data>
+  <data name="Table_UnnamedProperty" xml:space="preserve">
+    <value>&lt;Unnamed Property&gt;</value>
+  </data>
+  <data name="Table_UnnamedOption" xml:space="preserve">
+    <value>&lt;Unnamed Option&gt;</value>
+  </data>
+  <data name="Table_UnnamedGroup" xml:space="preserve">
+    <value>&lt;Unnamed Group&gt;</value>
   </data>
 </root>

@@ -47,22 +47,26 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
 	  <EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
-	  <ApplicationVersion>1</ApplicationVersion>
-	  <ApplicationDisplayVersion>0.0.0.1</ApplicationDisplayVersion>
+	  <ApplicationVersion>2</ApplicationVersion>
+	  <ApplicationDisplayVersion>0.1.0.0</ApplicationDisplayVersion>
 	  <AndroidKeyStore>False</AndroidKeyStore>
+	  <ApplicationId>com.lthoms.wkccomm</ApplicationId>
+	  <ApplicationTitle>WKC Communicator</ApplicationTitle>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
 	  <AndroidPackageFormat>apk</AndroidPackageFormat>
 	  <EnableLLVM>True</EnableLLVM>
-	  <ApplicationVersion>1</ApplicationVersion>
-	  <ApplicationDisplayVersion>0.0.0.1</ApplicationDisplayVersion>
+	  <ApplicationVersion>2</ApplicationVersion>
+	  <ApplicationDisplayVersion>0.1.0.0</ApplicationDisplayVersion>
 	  <AndroidKeyStore>False</AndroidKeyStore>
 	  <PublishTrimmed>True</PublishTrimmed>
 	  <RunAOTCompilation>False</RunAOTCompilation>
 	  <AndroidLinkTool>r8</AndroidLinkTool>
     <AndroidLinkMode>SdkOnly</AndroidLinkMode>
     <TrimMode>partial</TrimMode>
+    <ApplicationId>com.lthoms.wkccomm</ApplicationId>
+    <ApplicationTitle>WKC Communicator</ApplicationTitle>
 	</PropertyGroup>
 
 	<ItemGroup>

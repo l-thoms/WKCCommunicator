@@ -11,8 +11,9 @@
 		</VerticalStackLayout>
 
 		<ScrollView x:Name="DeviceSettingsView" IsVisible="Hidden">
-			<VerticalStackLayout Spacing="16">
-				<Border Margin="24, 0" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
+			<VerticalStackLayout Spacing="16" x:Name="DeviceSettingsLayout">
+				<Border x:Name="LegacySettingsBorder" Margin="24, 0" Padding="12" StrokeThickness="0"
+				BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
 					<Border.StrokeShape>
 						<RoundRectangle CornerRadius="12"/>
 					</Border.StrokeShape>
@@ -21,32 +22,31 @@
 						<Grid>
 							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_DeviceName}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
 							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
-								<Entry x:Name="DeviceNameEntry" MaxLength="30" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+								<Entry x:Name="DeviceNameEntry" MaxLength="30" VerticalOptions="Center" Margin="8,0" TextChanged="LegacyTextChanged"/>
 							</Grid>
 						</Grid>
 						<Grid>
 							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Owner}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
 							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
-								<Entry x:Name="OwnerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+								<Entry x:Name="OwnerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="LegacyTextChanged"/>
 							</Grid>
 						</Grid>
 						<Grid>
 							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Character}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
 							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
-								<Entry x:Name="CharacterEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+								<Entry x:Name="CharacterEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="LegacyTextChanged"/>
 							</Grid>
 						</Grid>
 						<Grid>
 							<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Manufacturer}" HorizontalOptions="Start" VerticalOptions="Center" FontSize="Medium"/>
 							<Grid HorizontalOptions="End" VerticalOptions="Center" WidthRequest="180">
-								<Entry x:Name="ManufacturerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="BasicInformationTextChanged"/>
+								<Entry x:Name="ManufacturerEntry" MaxLength="20" VerticalOptions="Center" Margin="8,0" TextChanged="LegacyTextChanged"/>
 							</Grid>
 						</Grid>
-						<Label Text="{x:Static res:AppResources.DeviceSettingsPage_Warning}" FontAttributes="Italic"/>
 					</VerticalStackLayout>
 				</Border>
-				<!--TODO: Table for custom quick settings-->
-				<Border Margin="24, 0" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
+				<VerticalStackLayout x:Name="SettingsTableLayout"  Spacing="16" Padding="0" Margin="0"/>
+				<Border x:Name="AdvancedSettingsBorder" Margin="24, 0, 24, 24" Padding="12,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceContainerLight}, Dark={StaticResource SurfaceContainerDark}}">
 					<Border.StrokeShape>
 						<RoundRectangle CornerRadius="12"/>
 					</Border.StrokeShape>

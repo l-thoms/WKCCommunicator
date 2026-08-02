@@ -8,7 +8,7 @@
 		<VerticalStackLayout VerticalOptions="Center" Spacing="6">
 			<Label HorizontalOptions="Center" Text="{x:Static res:AppResources.PairingView_InputPassKey}" Style="{StaticResource LabelLighter}" FontSize="Medium"/>
 			<HorizontalStackLayout HorizontalOptions="Center">
-				<Entry x:Name="KeyEntry" MaxLength="6" IsPassword="True"  HorizontalTextAlignment="Center" Keyboard="Numeric" FontSize="Title" CharacterSpacing="12"
+				<Entry x:Name="KeyEntry" MaxLength="6" IsPassword="True"  HorizontalTextAlignment="Center" Keyboard="Numeric" FontSize="Title" CharacterSpacing="6"
 				TextChanged="Entry_TextChanged" WidthRequest="240"/>
 			</HorizontalStackLayout>
 			<controls:UnaccentedButton Text="{x:Static res:AppResources.PairingView_Cancel}" Padding="0, 0" Margin="0,20" HorizontalOptions="Center" WidthRequest="96" Clicked="UnaccentedButton_Clicked"/>

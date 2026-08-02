@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Messaging;
 using Plugin.BLE.Android;
 using System.Diagnostics;
+using System.Text;
 using WkcCommunicator.Connections;
 using WkcCommunicator.Controls;
 using WkcCommunicator.Types;
@@ -18,8 +19,39 @@ public partial class MyDevicePage : ContentPage
 
 	private async Task SendKeyCodeAsync(byte keyCode)
 	{
-		if(Manager != null)
-			await Manager.SendCustomCommandAsync([(byte)CommandType.KeyCode, keyCode], null, "Failed to send key code");
+		if (Manager != null)
+		{
+			if (!await Manager.RequestQueue()) return;
+			byte[]? keyResult = await Manager.SendCustomCommandAsync([(byte)CommandType.KeyCode, keyCode]);
+			if (keyResult == null) Debug.WriteLine("Failed to send key code");
+			Manager.ReleaseQueue();
+		}
+	}
+
+	private async Task FetchShortcutsAsync()
+	{
+		if (Manager == null || Manager.ConnectedDevice == null) return;
+		if (!await Manager.RequestQueue()) return;
+		byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadShortcutTable], true);
+		if (result != null)
+		{
+			if (result.Length >= 1 && result[0] == 0)
+			{
+				byte[]? fetchResult = await Manager.GetCommandOutputAsync();
+				Manager.ReleaseQueue();
+				if (fetchResult == null) return;
+				string fetchString = Encoding.UTF8.GetString(fetchResult);
+				TableGroup[]? groups = AdapterManager.ParseTableGroups(fetchString);
+				if (groups is null) return;
+				Manager.InsetTableToLayout(groups, ShortcutTableLayout, TableGroupType.Shortcut);
+			}
+			else Manager.ReleaseQueue();
+		}
+		else
+		{
+			Manager.ReleaseQueue();
+			Debug.WriteLine("Failed to fetch shortcuts");
+		}
 	}
 
 	private async Task UpdateManagerAsync()
@@ -28,13 +60,16 @@ public partial class MyDevicePage : ContentPage
 		{
 			MyDeviceDisconnectedSign.IsVisible = true;
 			MyDeviceView.IsVisible = false;
+			foreach (var child in ShortcutTableLayout)
+				child.DisconnectHandlers();
+			ShortcutTableLayout.Clear();
 			return;
 		}
 		var physicalDevice = AdapterManager.GetPhysicalDevice(Manager.ConnectedDevice);
 		if (physicalDevice == null) return;
 		MyDeviceDisconnectedSign.IsVisible = false;
 		MyDeviceView.IsVisible = true;
-		await Task.Delay(1);
+		await FetchShortcutsAsync();
 	}
 
 	public MyDevicePage()

@@ -223,7 +223,7 @@ namespace WkcCommunicator.Resources {
         }
         
         /// <summary>
-        ///   查找类似 Basic Information 的本地化字符串。
+        ///   查找类似 Legacy Settings 的本地化字符串。
         /// </summary>
         internal static string DeviceSettingsPage_BasicInfo {
             get {
@@ -426,6 +426,33 @@ namespace WkcCommunicator.Resources {
         internal static string PairingView_InputPassKey {
             get {
                 return ResourceManager.GetString("PairingView_InputPassKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 &lt;Unnamed Group&gt; 的本地化字符串。
+        /// </summary>
+        internal static string Table_UnnamedGroup {
+            get {
+                return ResourceManager.GetString("Table_UnnamedGroup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 &lt;Unnamed Option&gt; 的本地化字符串。
+        /// </summary>
+        internal static string Table_UnnamedOption {
+            get {
+                return ResourceManager.GetString("Table_UnnamedOption", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 &lt;Unnamed Property&gt; 的本地化字符串。
+        /// </summary>
+        internal static string Table_UnnamedProperty {
+            get {
+                return ResourceManager.GetString("Table_UnnamedProperty", resourceCulture);
             }
         }
     }

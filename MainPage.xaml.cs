@@ -67,7 +67,12 @@ namespace WkcCommunicator
 						break;
 					}
 				}
-				if (!isValid) MyDeviceLayout.RemoveAt(i);
+				if (!isValid)
+				{
+					var child = MyDeviceLayout[i];
+					MyDeviceLayout.RemoveAt(i);
+					child.DisconnectHandlers();
+				}
 			}
 			// Add label not listed
 			foreach(var device in Manager.SavedDevices)
@@ -247,6 +252,7 @@ namespace WkcCommunicator
 							savedLabel.DeviceInfo.Character = deviceInfo.Character;
 							savedLabel.DeviceInfo.Manufacturer = deviceInfo.Manufacturer;
 							savedLabel.Update();
+							Manager.SaveDevicePreference();
 						}
 						deviceLabel = savedLabel;
 						break;
@@ -373,9 +379,12 @@ namespace WkcCommunicator
 
 		private async Task ConnectDeviceByLabel(DeviceLabel deviceLabel, bool reauthorize = false)
 		{
-			if (deviceLabel == null) return;
-			if (deviceLabel.DeviceInfo == null) return;
-			if(AdapterManager.GetPhysicalDevice(deviceLabel.DeviceInfo) != null) return;
+			if (!await Manager.RequestQueue()) return;
+			using var rsaService = RSA.Create();
+			using var source = new CancellationTokenSource();
+			if (deviceLabel == null) goto connectReturn;
+			if (deviceLabel.DeviceInfo == null) goto connectReturn;
+			if(AdapterManager.GetPhysicalDevice(deviceLabel.DeviceInfo) != null) goto connectReturn;
 			var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
 			async Task DisconnectNotify(string? notification)
 			{
@@ -416,23 +425,22 @@ namespace WkcCommunicator
 				if (securityCharacteristic == null)
 				{
 					await DisconnectNotify(AppResources.MainPage_FailedToReadCharacteristicsForVerification);
-					return;
+					goto connectReturn;
 				}
 				var readResult = await securityCharacteristic.ReadAsync();
 				publicKey = readResult.data;
 				if (publicKey == null)
 				{
 					await DisconnectNotify(AppResources.MainPage_FailedToReadVerificationData);
-					return;
+					goto connectReturn;
 				}
 			}
 			catch
 			{
 				await DisconnectNotify(AppResources.MainPage_FailedToConnectDevice);
-				return;
+				goto connectReturn;
 			}
 
-			using var rsaService = RSA.Create();
 			rsaService.ImportRSAPublicKey(publicKey, out _);
 			List<byte> verifyMessage;
 
@@ -442,7 +450,7 @@ namespace WkcCommunicator
 				if (!pairingResult.Confirmed)
 				{
 					await DisconnectNotify(null);
-					return;
+					goto connectReturn;
 				}
 				verifyMessage = new([0]);
 				verifyMessage.AddRange(BitConverter.GetBytes(pairingResult.Key));
@@ -460,7 +468,7 @@ namespace WkcCommunicator
 				if (savedDevice == null || savedDevice.Key == null)
 				{
 					await DisconnectNotify(AppResources.MainPage_DeviceNotVerified);
-					return;
+					goto connectReturn;
 				}
 				verifyMessage.AddRange(Encoding.UTF8.GetBytes(savedDevice.Key));
 			}
@@ -470,7 +478,7 @@ namespace WkcCommunicator
 			if (securityCharacteristic.Value.Length == 0 || securityCharacteristic.Value[0] != 0)
 			{
 				await DisconnectNotify(AppResources.MainPage_FailedToVerify);
-				return;
+				goto connectReturn;
 			}
 			await securityCharacteristic.StopUpdatesAsync();
 			if (savedDevice != null && reauthorize) savedDevice.Key = deviceLabel.DeviceInfo.Key;
@@ -485,8 +493,9 @@ namespace WkcCommunicator
 			}
 			await SyncTime(savedDevice);
 			Manager.ConnectedDevice = savedDevice;
-			using var source = new CancellationTokenSource();
 			await Toast.Make(AppResources.MainPage_DeviceConnected).Show(source.Token);
+		connectReturn:
+			Manager.ReleaseQueue();
 		}
 
 		private void Adapter_ScanTimeoutElapsed(object? sender, EventArgs e)

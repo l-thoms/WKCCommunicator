@@ -13,11 +13,6 @@ An Android-only and BLE-based application to control WKC devices. Written in .NE
 
 Communication protocol does not use BLE native pairing method for the convenience of mobile phone operation.
 
-## TODO
-
-- [ ] Add support for device firmware-specified shortcut and settings table.
-- [ ] The next version of the protocol will stop reading settings entries directly from advertise data and will read the settings table from the characteristic instead.
-
 ## License
 
 The project is under **GNU GPL v3.0**. Third-party components retain their respactive licenses.

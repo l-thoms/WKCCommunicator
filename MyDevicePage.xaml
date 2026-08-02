@@ -52,7 +52,7 @@
 						</Grid>
 					</VerticalStackLayout>
 				</Border>
-				<!--TODO: Table for custom quick commands-->
+				<VerticalStackLayout x:Name="ShortcutTableLayout"  Spacing="16" Padding="0" Margin="0, 0, 0, 24"/>
 			</VerticalStackLayout>
 		</ScrollView>
 	</Grid>

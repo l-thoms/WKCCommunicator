@@ -205,7 +205,7 @@
     <value>下一版協議將取消直接從廣播數據中讀取設置條目，改為從特徵值、中讀取設置列表。</value>
   </data>
   <data name="DeviceSettingsPage_BasicInfo" xml:space="preserve">
-    <value>基本資訊</value>
+    <value>舊版設定</value>
   </data>
   <data name="DeviceSettingsPage_DeviceName" xml:space="preserve">
     <value>設備名稱</value>
@@ -239,5 +239,14 @@
   </data>
   <data name="DeleteView_Delete" xml:space="preserve">
     <value>删除</value>
+  </data>
+  <data name="Table_UnnamedProperty" xml:space="preserve">
+    <value>&lt;未命名屬性&gt;</value>
+  </data>
+  <data name="Table_UnnamedOption" xml:space="preserve">
+    <value>&lt;未命名選項&gt;</value>
+  </data>
+  <data name="Table_UnnamedGroup" xml:space="preserve">
+    <value>&lt;未命名分組&gt;</value>
   </data>
 </root>

@@ -13,33 +13,55 @@ namespace WkcCommunicator;
 public partial class DeviceSettingsPage : ContentPage
 {
 	public AdapterManager? Manager{ get; set; }
-	private bool IsSettingsUpdating { get; set; } = false;
 
-	private void UpdateBasicInformation()
+	private async Task UpdateBasicInformation()
 	{
 		if (Manager == null || Manager.ConnectedDevice == null) return;
-		DeviceNameEntry.Text = Manager.ConnectedDevice.Name;
-		OwnerEntry.Text = Manager.ConnectedDevice.Owner;
-		CharacterEntry.Text = Manager.ConnectedDevice.Character;
-		ManufacturerEntry.Text = Manager.ConnectedDevice.Manufacturer;
+		if (Manager.ConnectedDevice.ProtocolVersion == null || Manager.ConnectedDevice.ProtocolVersion[1] == 0)
+		{
+			LegacySettingsBorder.IsVisible = true;
+			DeviceNameEntry.Text = Manager.ConnectedDevice.Name;
+			OwnerEntry.Text = Manager.ConnectedDevice.Owner;
+			CharacterEntry.Text = Manager.ConnectedDevice.Character;
+			ManufacturerEntry.Text = Manager.ConnectedDevice.Manufacturer;
+		}
+		else
+		{
+			LegacySettingsBorder.IsVisible = false;
+			await FetchSettingsAsync();
+		}
 	}
 
 	private async Task FetchSettingsAsync()
 	{
 		if (Manager != null)
-			await Manager.SendCustomCommandAsync([(byte)CommandType.ReadSettingsItem], (result) =>
+		{
+			if (!await Manager.RequestQueue()) return;
+			byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadSettingsTable], true);
+			if (result != null)
 			{
-				if (result.Length <= 1) return;
-				var resultText = Encoding.UTF8.GetString(result);
-				Debug.WriteLine(resultText);
-				var resultRaw = JsonConvert.DeserializeObject<WkcSettingsRaw>(resultText);
-				resultRaw.brightness = resultRaw.brightness > 10 ? 10 : resultRaw.brightness < 0 ? 0 : resultRaw.brightness;
-			}, "Failed to read settings");
+				if (result.Length >= 1 && result[0] == 0)
+				{
+					byte[]? fetchResult = await Manager.GetCommandOutputAsync();
+					Manager.ReleaseQueue();
+					if (fetchResult == null) return;
+					string fetchString = Encoding.UTF8.GetString(fetchResult);
+					TableGroup[]? groups = AdapterManager.ParseTableGroups(fetchString);
+					if (groups is null) return;
+					Manager.InsetTableToLayout(groups, SettingsTableLayout, TableGroupType.Settings);
+				}
+				else Manager.ReleaseQueue();
+			}
+			else
+			{
+				Manager.ReleaseQueue();
+				Debug.WriteLine("Failed to fetch settings");
+			}
+		}
 	}
 
 	private async void UpdateManagerAsync()
 	{
-		IsSettingsUpdating = true;
 		if(Manager?.ConnectedDevice == null)
 		{
 			DeviceSettingsDisconnectedSign.IsVisible = true;
@@ -48,15 +70,16 @@ public partial class DeviceSettingsPage : ContentPage
 			OwnerEntry.ClearValue(Entry.TextProperty);
 			CharacterEntry.ClearValue(Entry.TextProperty);
 			ManufacturerEntry.ClearValue(Entry.TextProperty);
+			foreach (var child in SettingsTableLayout)
+				child.DisconnectHandlers();
+			SettingsTableLayout.Clear();
 			return;
 		}
 		var physicalDevice = AdapterManager.GetPhysicalDevice(Manager.ConnectedDevice);
 		if (physicalDevice == null) return;
 		DeviceSettingsDisconnectedSign.IsVisible = false;
 		DeviceSettingsView.IsVisible = true;
-		UpdateBasicInformation();
-		//await FetchSettingsAsync();
-		IsSettingsUpdating = false;
+		await UpdateBasicInformation();
 	}
 
 	public DeviceSettingsPage()
@@ -92,13 +115,19 @@ public partial class DeviceSettingsPage : ContentPage
 		sendResult[0] = (byte)CommandType.WriteSettings;
 		Buffer.BlockCopy(Encoding.UTF8.GetBytes(jsonResult), 0, sendResult, 1, sendResult.Length - 1);
 		if (Manager != null)
-			await Manager.SendCustomCommandAsync(sendResult, null, "Failed to send settings");
+		{
+			if (!await Manager.RequestQueue()) return;
+			byte[]? settingsResult = await Manager.SendCustomCommandAsync(sendResult);
+			if (settingsResult == null) Debug.WriteLine("Failed to send settings");
+			Manager.ReleaseQueue();
+		}
 	}
 
-	private async void BasicInformationTextChanged(object sender, TextChangedEventArgs e)
+	private async void LegacyTextChanged(object sender, TextChangedEventArgs e)
 	{
 		if (Manager == null) return;
 		if (Manager.ConnectedDevice == null) return;
+		if (Manager.ConnectedDevice.ProtocolVersion != null && Manager.ConnectedDevice.ProtocolVersion[1] != 0) return;
 		string key = "", value = "";
 		var entry = sender as Entry;
 		if (entry != null) value = entry.Text;

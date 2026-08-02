@@ -1,4 +1,6 @@
+using Android.OS.Strictmode;
 using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Maui.Views;
 using Newtonsoft.Json;
@@ -11,6 +13,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using WkcCommunicator.Controls;
 using WkcCommunicator.Types;
@@ -224,41 +228,526 @@ namespace WkcCommunicator.Connections
 			}
 		}
 
-		public async Task SendCustomCommandAsync(byte[]? command, Action<byte[]>? callback, string failedInfo = "")
+		public async Task<byte[]?> SendCustomCommandAsync(byte[]? command, bool notify = false)
 		{
-			if (ConnectedDevice == null) return;
-			bool request = await RequestQueue();
-			if (!request) return;
+			if (ConnectedDevice == null) return null;
 			var commandCharacteristic = await GetCommandCharacteristicAsync(ConnectedDevice);
 			if (commandCharacteristic != null && command != null)
 			{
 				try
 				{
+					if (notify)
+						await commandCharacteristic.StartUpdatesAsync();
 					await commandCharacteristic.WriteAsync(command);
+					if (notify)
+						await commandCharacteristic.StopUpdatesAsync();
 					var result = commandCharacteristic.Value;
-					if(callback != null)
-						callback(result);
+					return result;
 				}
 				catch
 				{
-					Debug.WriteLine(failedInfo);
+					return null;
 				}
 			}
-			ReleaseQueue();
+			else return null;
+		}
+
+		public async Task<byte[]?> GetCommandOutputAsync(Action? failedCallback = null)
+		{
+			if (ConnectedDevice == null) return null;
+			var commandCharacteristic = await GetCommandCharacteristicAsync(ConnectedDevice);
+			//byte[]? output = null;
+			List<byte> outputList = new List<byte>();
+			if (commandCharacteristic != null)
+			{
+				try
+				{
+					byte[]? output = null;
+					do
+					{
+						var result = await commandCharacteristic.ReadAsync();
+						if (result.resultCode == 0)
+						{
+							output = result.data;
+							outputList.AddRange(output.Skip(1));
+						}
+						else break;
+					} while (output != null && output.Length > 0 && output[0] != 0);
+				}
+				catch
+				{
+					if (failedCallback != null)
+						failedCallback();
+				}
+			}
+			return outputList.ToArray();
+		}
+
+		public static TableGroup[]? ParseTableGroups(string tableGroups)
+		{
+			JsonNode? node;
+			try
+			{
+				node = JsonNode.Parse(tableGroups);
+			}
+			catch
+			{
+				return null;
+			}
+
+			if (node == null || node.GetValueKind() != JsonValueKind.Array) return null;
+			JsonArray array = node.AsArray();
+			List<TableGroup> result = new List<TableGroup>();
+			foreach (var group in array)
+			{
+				if (group == null) continue;
+				JsonNode? groupNameNode = group["name"];
+				string groupName;
+				if (groupNameNode == null || groupNameNode.GetValueKind() != JsonValueKind.String)
+					groupName = AppResources.Table_UnnamedGroup;
+				else
+					groupName = groupNameNode.GetValue<string>();
+				List<TableItem> items = new List<TableItem>();
+				JsonNode? itemsNode = group["items"];
+				JsonArray itemsArray;
+				if (itemsNode != null && itemsNode.GetValueKind() == JsonValueKind.Array)
+					itemsArray = itemsNode.AsArray();
+				else
+				{
+					result.Add(new TableGroup() { Name = groupName, Items = null });
+					continue;
+				}
+
+				foreach (var item in itemsArray)
+				{
+					try
+					{
+						if (item == null) continue;
+						JsonNode? typeNode = item["type"];
+						if (typeNode == null || typeNode.GetValueKind() != JsonValueKind.String) continue;
+						string typeString = typeNode.GetValue<string>();
+						TableItem tableItem = new TableItem();
+						JsonNode? itemNameNode = item["name"];
+						JsonNode? displayNameNode = item["display_name"];
+						JsonNode? optionsNode = item["options"];
+						JsonNode? valueNode = item["value"];
+						JsonNode? minNode = item["min"];
+						JsonNode? maxNode = item["max"];
+						JsonNode? lengthNode = item["length"];
+						if (itemNameNode == null || itemNameNode.GetValueKind() != JsonValueKind.String)
+							continue;
+						else
+							tableItem.Name = itemNameNode.GetValue<string>();
+						if (displayNameNode == null || displayNameNode.GetValueKind() != JsonValueKind.String)
+							tableItem.DisplayName = AppResources.Table_UnnamedProperty;
+						else
+							tableItem.DisplayName = displayNameNode.GetValue<string>();
+						tableItem.Type = typeString switch
+						{
+							"action" => TableItemType.Action,
+							"switch" => TableItemType.Switch,
+							"integer" => TableItemType.Integer,
+							"decimal" => TableItemType.Decimal,
+							"picker" => TableItemType.Picker,
+							"string" => TableItemType.String,
+							_ => TableItemType.Unknown
+						};
+						switch (tableItem.Type)
+						{
+							case TableItemType.Action:
+							case TableItemType.Picker:
+								if (optionsNode != null && optionsNode.GetValueKind() == JsonValueKind.Array)
+								{
+									List<string> optionsList = new List<string>();
+									JsonArray optionsArray = optionsNode.AsArray();
+									foreach (var option in optionsArray)
+									{
+										if (option == null || option.GetValueKind() != JsonValueKind.String)
+											optionsList.Add(AppResources.Table_UnnamedOption);
+										else
+											optionsList.Add(option.GetValue<string>());
+									}
+									tableItem.Options = optionsList.ToArray();
+								}
+								if (valueNode != null && valueNode.GetValueKind() == JsonValueKind.Number)
+									tableItem.NumberValue = Convert.ToInt32(valueNode.GetValue<double>());
+								break;
+							case TableItemType.Switch:
+								if (valueNode != null && valueNode.GetValueKind() == JsonValueKind.True)
+									tableItem.BoolValue = true;
+								break;
+							case TableItemType.Integer:
+							case TableItemType.Decimal:
+								if (minNode != null && minNode.GetValueKind() == JsonValueKind.Number)
+									tableItem.Min = tableItem.Type == TableItemType.Integer ? Convert.ToInt32(minNode.GetValue<double>()) : minNode.GetValue<double>();
+								else
+									tableItem.Min = tableItem.Type == TableItemType.Integer ? int.MinValue : double.MinValue;
+
+								if (maxNode != null && maxNode.GetValueKind() == JsonValueKind.Number)
+									tableItem.Max = tableItem.Type == TableItemType.Integer ? Convert.ToInt32(maxNode.GetValue<double>()) : maxNode.GetValue<double>();
+								else
+									tableItem.Max = tableItem.Type == TableItemType.Integer ? int.MaxValue : double.MaxValue;
+
+								if (tableItem.Min > tableItem.Max)
+									continue;
+								if (valueNode != null && valueNode.GetValueKind() == JsonValueKind.Number)
+									tableItem.NumberValue = tableItem.Type == TableItemType.Integer ? Convert.ToInt32(valueNode.GetValue<double>()) : valueNode.GetValue<double>();
+								if (tableItem.NumberValue < tableItem.Min) tableItem.NumberValue = tableItem.Min;
+								if (tableItem.NumberValue > tableItem.Max) tableItem.NumberValue = tableItem.Max;
+								break;
+							case TableItemType.String:
+								if (lengthNode != null && lengthNode.GetValueKind() == JsonValueKind.Number)
+									tableItem.StringLength = Convert.ToInt32(lengthNode.GetValue<double>());
+								else
+									tableItem.StringLength = 30;
+								if (valueNode != null && valueNode.GetValueKind() == JsonValueKind.String)
+									tableItem.StringValue = valueNode.GetValue<string>();
+								else
+									tableItem.StringValue = "";
+								break;
+							default:
+								continue;
+						}
+						items.Add(tableItem);
+					}
+					catch
+					{
+						continue;
+					}
+				}
+
+				result.Add(new TableGroup() { Name = groupName, Items = items.ToArray() });
+			}
+			return result.ToArray();
+		}
+
+		public void InsetTableToLayout(TableGroup[]? groups, Layout layout, TableGroupType type)
+		{
+			if (groups == null) return;
+			foreach (var group in groups)
+			{
+				Border groupBorder = new Border()
+				{
+					Margin = new Thickness(24, 0),
+					Padding = new Thickness(12),
+					StrokeThickness = 0,
+					StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle()
+					{
+						CornerRadius = 12
+					}
+				};
+				if (Application.Current != null)
+					groupBorder.SetAppTheme(VisualElement.BackgroundColorProperty, Application.Current.Resources["SurfaceContainerLight"],
+					Application.Current.Resources["SurfaceContainerDark"]);
+
+				VerticalStackLayout groupLayout = new VerticalStackLayout()
+				{
+					Spacing = 12
+				};
+				Label groupTitle = new Label()
+				{
+					Margin = new Thickness(4),
+					FontSize = Convert.ToDouble(new FontSizeConverter().ConvertFromString("Large")),
+					Text = group.Name ?? Resources.AppResources.Table_UnnamedGroup
+				};
+				groupLayout.Add(groupTitle);
+				if (group.Items != null)
+					foreach (var item in group.Items)
+					{
+						if (item.Name == null) continue;
+						Grid itemGrid = new Grid()
+						{
+							HorizontalOptions = LayoutOptions.Fill
+						};
+						Label displayNameLabel = new Label()
+						{
+							Text = item.DisplayName,
+							HorizontalOptions = LayoutOptions.Start,
+							VerticalOptions = LayoutOptions.Center,
+							FontSize = Convert.ToDouble(new FontSizeConverter().ConvertFromString("Medium")),
+							MaxLines = 1,
+							MinimumWidthRequest = 150,
+						};
+						itemGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+						itemGrid.Add(displayNameLabel);
+						itemGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+						itemGrid.ColumnSpacing = 12;
+						ConcurrentQueue<JsonNode?> transmissionQueue = new ConcurrentQueue<JsonNode?>();
+						bool onTransmit = false;
+						byte[]? generateCommit(JsonNode? data)
+						{
+							if (item.Name == null) return null;
+							JsonObject commandObject = new JsonObject();
+							commandObject.Add(item.Name, data);
+							List<byte> optionCommand = new List<byte>();
+							optionCommand.Add(Convert.ToByte(type == TableGroupType.Shortcut ? CommandType.WriteShortcut : CommandType.WriteSettings));
+							optionCommand.AddRange(Encoding.UTF8.GetBytes(commandObject.ToJsonString()));
+							return optionCommand.ToArray();
+						}
+						async Task commit(JsonNode? data)
+						{
+							if (item.Name == null) return;
+							bool lastOnTransmit = onTransmit;
+							onTransmit = true;
+							if (lastOnTransmit)
+							{
+								transmissionQueue.Enqueue(data);
+								return;
+							}
+							await RequestQueue();
+							byte[]? generated;
+							generated = generateCommit(data);
+							if (generated != null)
+								await this.SendCustomCommandAsync(generated);
+							while (transmissionQueue.Count != 0)
+							{
+								int tCount = transmissionQueue.Count;
+								JsonNode? outNode = null;
+								for(int i = 0; i < tCount; i++)
+									transmissionQueue.TryDequeue(out outNode);
+								generated = generateCommit(outNode);
+								if (generated != null)
+									await this.SendCustomCommandAsync(generated);
+							}
+							ReleaseQueue();
+							onTransmit = false;
+						}
+						switch (item.Type)
+						{
+							case TableItemType.Action:
+								ScrollView actionScroll = new ScrollView()
+								{
+									Orientation = ScrollOrientation.Horizontal,
+									HorizontalOptions = LayoutOptions.Fill,
+									VerticalOptions = LayoutOptions.Center,
+								};
+								itemGrid.Add(actionScroll);
+								itemGrid.SetColumn(actionScroll, 1);
+								Grid actionGrid = new Grid()
+								{
+									HorizontalOptions = LayoutOptions.Fill,
+									VerticalOptions = LayoutOptions.Fill,
+								};
+								actionScroll.Content = actionGrid;
+								HorizontalStackLayout actionStackLayout = new HorizontalStackLayout()
+								{
+									VerticalOptions = LayoutOptions.Center,
+									HorizontalOptions = LayoutOptions.End,
+									Spacing = 6
+								};
+								async Task updateStackAlignment(ScrollView scrollView, HorizontalStackLayout stackLayout)
+								{
+									double viewportWidth = scrollView.Width;
+									double contentDesiredWidth = stackLayout.DesiredSize.Width;
+
+									if (viewportWidth <= 0)
+										return;
+
+									if (contentDesiredWidth <= viewportWidth)
+									{
+										stackLayout.HorizontalOptions = LayoutOptions.End;
+										scrollView.Orientation = ScrollOrientation.Neither;
+										await scrollView.ScrollToAsync(0, 0, false);
+									}
+									else
+									{
+										stackLayout.HorizontalOptions = LayoutOptions.Start;
+										scrollView.Orientation = ScrollOrientation.Horizontal;
+									}
+								}
+								actionScroll.SizeChanged += async (sender, e) => await updateStackAlignment(actionScroll, actionStackLayout);
+								actionStackLayout.SizeChanged += async (sender, e) => await updateStackAlignment(actionScroll, actionStackLayout);
+								actionGrid.Add(actionStackLayout);
+								if (item.Options != null)
+									for (int i = 0; i < item.Options.Length; i++)
+									{
+										Controls.UnaccentedButton optionButton = new UnaccentedButton()
+										{
+											Text = item.Options[i],
+											MinimumWidthRequest = 60
+										};
+										int optionIndex = i;
+										optionButton.Clicked += async (sender, e) => await commit(optionIndex);
+										actionStackLayout.Add(optionButton);
+									}
+								break;
+							case TableItemType.Switch:
+								Microsoft.Maui.Controls.Switch commandSwitch = new Microsoft.Maui.Controls.Switch();
+								commandSwitch.IsToggled = item.BoolValue;
+								itemGrid.Add(commandSwitch);
+								itemGrid.SetColumn(commandSwitch, 1);
+								commandSwitch.HorizontalOptions = LayoutOptions.End;
+								commandSwitch.Toggled += async (sender, e) => await commit(commandSwitch.IsToggled);
+								break;
+							case TableItemType.Integer:
+							case TableItemType.Decimal:
+								Grid numberGrid = new Grid();
+								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+								numberGrid.ColumnSpacing = 6;
+								Entry numberEntry = new Entry();
+								UnaccentedButton numberUpButton = new UnaccentedButton() { Text = "+"};
+								UnaccentedButton numberDownButton = new UnaccentedButton() { Text = "-" };
+								numberEntry.Keyboard = Keyboard.Numeric;
+								double currentValueDecimal = item.NumberValue;
+								int currentValueInt = Convert.ToInt32(item.NumberValue);
+								numberEntry.Text = item.Type == TableItemType.Decimal ? currentValueDecimal.ToString() : currentValueInt.ToString();
+								numberUpButton.WidthRequest = 24;
+								numberDownButton.WidthRequest = 24;
+								numberEntry.VerticalOptions = LayoutOptions.Center;
+								numberUpButton.VerticalOptions = LayoutOptions.Center;
+								numberDownButton.VerticalOptions = LayoutOptions.Center;
+								bool isValueValid = true;
+								numberEntry.TextChanged += async (sender, e) =>
+								{
+									string originalText = numberEntry.Text;
+									string formattedText = "";
+									bool exceed = true;
+									for (int i = 0; i < originalText.Length; i++)
+									{
+										if (char.IsAsciiDigit(originalText[i]) || originalText[i] == '-' ||
+											originalText[i] == '.' && item.Type == TableItemType.Decimal)
+											formattedText += originalText[i];
+									}
+									try
+									{
+										if (item.Type == TableItemType.Integer)
+										{
+											currentValueInt = Convert.ToInt32(formattedText);
+											if (currentValueInt < Convert.ToInt32(item.Min)) currentValueInt = Convert.ToInt32(item.Min);
+											else if (currentValueInt > Convert.ToInt32(item.Max)) currentValueInt = Convert.ToInt32(item.Max);
+											else exceed = false;
+											if (exceed)
+												formattedText = currentValueInt.ToString();
+										}
+										else
+										{
+											currentValueDecimal = Convert.ToDouble(formattedText);
+											if (currentValueDecimal < item.Min) currentValueDecimal = item.Min;
+											else if (currentValueDecimal > item.Max) currentValueDecimal = item.Max;
+											else exceed = false;
+											if (exceed)
+												formattedText = currentValueDecimal.ToString("0.###");
+										}
+										isValueValid = true;
+									}
+									catch
+									{
+										isValueValid = false;
+									}
+									if (originalText != formattedText)
+									{
+										numberEntry.Text = formattedText;
+										numberEntry.CursorPosition = formattedText.Length;
+									}
+									if (isValueValid)
+										await commit(item.Type == TableItemType.Integer ? currentValueInt : currentValueDecimal);
+								};
+								numberUpButton.Clicked += (sender, e) =>
+								{
+									if (item.Type == TableItemType.Integer)
+									{
+										if (++currentValueInt > Convert.ToInt32(item.Max)) currentValueInt = Convert.ToInt32(item.Max);
+										numberEntry.Text = currentValueInt.ToString();
+									}
+									else
+									{
+										if (++currentValueDecimal > item.Max) currentValueDecimal = item.Max;
+										numberEntry.Text = currentValueDecimal.ToString("0.###");
+									}
+								};
+								numberDownButton.Clicked += (sender, e) =>
+								{
+									if (item.Type == TableItemType.Integer)
+									{
+										if (--currentValueInt < Convert.ToInt32(item.Min)) currentValueInt = Convert.ToInt32(item.Min);
+										numberEntry.Text = currentValueInt.ToString();
+									}
+									else
+									{
+										if (--currentValueDecimal < item.Min) currentValueDecimal = item.Min;
+										numberEntry.Text = currentValueDecimal.ToString("0.###");
+									}
+								};
+								numberGrid.Add(numberEntry);
+								numberGrid.Add(numberUpButton);
+								numberGrid.SetColumn(numberUpButton, 1);
+								numberGrid.Add(numberDownButton);
+								numberGrid.SetColumn(numberDownButton, 2);
+								itemGrid.Add(numberGrid);
+								itemGrid.SetColumn(numberGrid, 1);
+								break;
+							case TableItemType.Picker:
+								UnaccentedButton pickerBackground = new UnaccentedButton();
+								BorderlessPicker picker = new BorderlessPicker();
+								picker.Opacity = 0;
+								pickerBackground.BindingContext = picker;
+								pickerBackground.SetBinding(Button.TextProperty, static (Picker p) => p.SelectedItem);
+								picker.HorizontalTextAlignment = TextAlignment.Center;
+								
+								if (item.Options != null)
+									foreach (var option in item.Options)
+									{
+										picker.Items.Add(option);
+									}
+								picker.SelectedIndex = Convert.ToInt32(item.NumberValue);
+								itemGrid.Add(pickerBackground);
+								itemGrid.Add(picker);
+								itemGrid.SetColumn(picker, 1);
+								itemGrid.SetColumn(pickerBackground, 1);
+								picker.VerticalOptions = LayoutOptions.Center;
+								picker.HorizontalOptions = LayoutOptions.Fill;
+								picker.SelectedIndexChanged += async (sender, e) => await commit(picker.SelectedIndex);
+								break;
+							case TableItemType.String:
+								Entry entry = new Entry();
+								entry.Text = item.StringValue ?? "";
+								itemGrid.Add(entry);
+								itemGrid.SetColumn(entry, 1);
+								entry.VerticalOptions = LayoutOptions.Center;
+								entry.HorizontalOptions = LayoutOptions.Fill;
+								entry.Margin = new Thickness(0, 0, 2, 0);
+								entry.TextChanged += async (sender, e) =>
+								{
+									string formattedText = entry.Text;
+									byte[] utf8_char = Encoding.UTF8.GetBytes(formattedText);
+									int cp = entry.CursorPosition;
+									while (item.StringLength >= 0 && utf8_char.Length > item.StringLength && utf8_char.Length > 0)
+									{
+										if (cp == 0) cp = 1;
+										formattedText = formattedText.Substring(0, cp) + formattedText.Substring(cp + 1, formattedText.Length - cp - 1);
+										if (cp > 0)
+											entry.CursorPosition = cp - 1;
+										utf8_char = Encoding.UTF8.GetBytes(formattedText);
+									}
+									entry.CursorPosition = cp;
+									if (entry.Text != formattedText) entry.Text = formattedText;
+									await commit(formattedText);
+								};
+								break;
+						}
+						groupLayout.Add(itemGrid);
+					}
+				groupBorder.Content = groupLayout;
+				layout.Add(groupBorder);
+			}
 		}
 
 		public async Task DisconnectToDeviceForce(WkcDeviceInfo? deviceInfo, bool connectionLost = false)
 		{
-			ClearRequest();
-			if (deviceInfo == null || !AllowDisconnect) return;
+			if (!await RequestQueue()) return;
+			if (deviceInfo == null || !AllowDisconnect)
+			{
+				ClearRequest();
+				return;
+			}
 			var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
 			var physicalDevice = GetPhysicalDevice(deviceInfo);
 			if (physicalDevice == null)
 			{
-				if (connectionLost)
-				{
-					ConnectedDevice = null;
-				}
+				ConnectedDevice = null;
+				ClearRequest();
 				return;
 			}
 			if (physicalDevice.State != Plugin.BLE.Abstractions.DeviceState.Disconnected)
@@ -280,7 +769,6 @@ namespace WkcCommunicator.Connections
 					physicalDevice = GetPhysicalDevice(deviceInfo);
 					if (!connectionLost && physicalDevice != null)
 					{
-						CancellationToken token = new CancellationToken();
 						await adapter.DisconnectDeviceAsync(physicalDevice);
 						physicalDevice.Dispose();
 					}
@@ -290,6 +778,7 @@ namespace WkcCommunicator.Connections
 					Debug.WriteLine(ex.Message);
 				}
 			}
+			ClearRequest();
 		}
 
 		public async Task DeleteDevice(WkcDeviceInfo deviceInfo)
