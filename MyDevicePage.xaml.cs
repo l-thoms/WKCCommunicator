@@ -28,11 +28,18 @@ public partial class MyDevicePage : ContentPage
 		}
 	}
 
+	void ClearShortcutControls()
+	{
+		foreach (var child in ShortcutTableLayout)
+			child.DisconnectHandlers();
+		ShortcutTableLayout.Clear();
+	}
+
 	private async Task FetchShortcutsAsync()
 	{
 		if (Manager == null || Manager.ConnectedDevice == null) return;
 		if (!await Manager.RequestQueue()) return;
-		byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadShortcutTable], true);
+		byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadShortcutTable]);
 		if (result != null)
 		{
 			if (result.Length >= 1 && result[0] == 0)
@@ -60,16 +67,15 @@ public partial class MyDevicePage : ContentPage
 		{
 			MyDeviceDisconnectedSign.IsVisible = true;
 			MyDeviceView.IsVisible = false;
-			foreach (var child in ShortcutTableLayout)
-				child.DisconnectHandlers();
-			ShortcutTableLayout.Clear();
 			return;
 		}
 		var physicalDevice = AdapterManager.GetPhysicalDevice(Manager.ConnectedDevice);
 		if (physicalDevice == null) return;
 		MyDeviceDisconnectedSign.IsVisible = false;
 		MyDeviceView.IsVisible = true;
-		await FetchShortcutsAsync();
+		ClearShortcutControls();
+		if (Manager.ConnectedDevice.ProtocolVersion != null && Manager.ConnectedDevice.ProtocolVersion[1] >= 1)
+			await FetchShortcutsAsync();
 	}
 
 	public MyDevicePage()

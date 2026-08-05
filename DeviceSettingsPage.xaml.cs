@@ -16,6 +16,9 @@ public partial class DeviceSettingsPage : ContentPage
 
 	private async Task UpdateBasicInformation()
 	{
+		foreach (var child in SettingsTableLayout)
+			child.DisconnectHandlers();
+		SettingsTableLayout.Clear();
 		if (Manager == null || Manager.ConnectedDevice == null) return;
 		if (Manager.ConnectedDevice.ProtocolVersion == null || Manager.ConnectedDevice.ProtocolVersion[1] == 0)
 		{
@@ -37,7 +40,7 @@ public partial class DeviceSettingsPage : ContentPage
 		if (Manager != null)
 		{
 			if (!await Manager.RequestQueue()) return;
-			byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadSettingsTable], true);
+			byte[]? result = await Manager.SendCustomCommandAsync([(byte)CommandType.ReadSettingsTable]);
 			if (result != null)
 			{
 				if (result.Length >= 1 && result[0] == 0)
@@ -60,7 +63,7 @@ public partial class DeviceSettingsPage : ContentPage
 		}
 	}
 
-	private async void UpdateManagerAsync()
+	private async Task UpdateManagerAsync()
 	{
 		if(Manager?.ConnectedDevice == null)
 		{
@@ -70,9 +73,6 @@ public partial class DeviceSettingsPage : ContentPage
 			OwnerEntry.ClearValue(Entry.TextProperty);
 			CharacterEntry.ClearValue(Entry.TextProperty);
 			ManufacturerEntry.ClearValue(Entry.TextProperty);
-			foreach (var child in SettingsTableLayout)
-				child.DisconnectHandlers();
-			SettingsTableLayout.Clear();
 			return;
 		}
 		var physicalDevice = AdapterManager.GetPhysicalDevice(Manager.ConnectedDevice);
@@ -85,14 +85,14 @@ public partial class DeviceSettingsPage : ContentPage
 	public DeviceSettingsPage()
 	{
 		InitializeComponent();
-		WeakReferenceMessenger.Default.Register<AdapterManager, string>(this, "AdapterManager", (r, m) =>
+		WeakReferenceMessenger.Default.Register<AdapterManager, string>(this, "AdapterManager", async (r, m) =>
 		{
 			bool isInit = Manager == null;
 			this.Manager = m;
 			if (isInit && Manager != null)
 			{
-				UpdateManagerAsync();
-				this.Manager.ConnectedDeviceChanged += (s, e) => UpdateManagerAsync();
+				this.Manager.ConnectedDeviceChanged += async (s, e) => await UpdateManagerAsync();
+				await UpdateManagerAsync();
 			}
 		});
 	}

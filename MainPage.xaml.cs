@@ -388,7 +388,7 @@ namespace WkcCommunicator
 			var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
 			async Task DisconnectNotify(string? notification)
 			{
-				await Manager.DisconnectToDeviceForce(deviceLabel.DeviceInfo);
+				await Manager.DisconnectToDeviceForce(deviceLabel.DeviceInfo, requestQueue: false);
 				if (notification != null)
 				{
 					using var source = new CancellationTokenSource();
@@ -398,7 +398,7 @@ namespace WkcCommunicator
 			// Disconnect pervious device
 			if (Manager.ConnectedDevice != null)
 			{
-				await Manager.DisconnectToDeviceForce(Manager.ConnectedDevice);
+				await Manager.DisconnectToDeviceForce(Manager.ConnectedDevice, requestQueue: false);
 				Manager.ConnectedDevice = null;
 			}
 
@@ -420,6 +420,7 @@ namespace WkcCommunicator
 			try
 			{
 				currentDevice = await adapter.ConnectToKnownDeviceAsync(AddressToGuid(deviceLabel.DeviceInfo.Address));
+				await currentDevice.RequestMtuAsync(240);
 				// Grab public key
 				securityCharacteristic = await AdapterManager.GetSecurityCharacteristicAsync(currentDevice);
 				if (securityCharacteristic == null)
@@ -491,8 +492,11 @@ namespace WkcCommunicator
 				NearbyDeviceLayout.Remove(deviceLabel);
 				MyDeviceLayout.Add(deviceLabel);
 			}
-			await SyncTime(savedDevice);
+			var commandCharacteristics = await AdapterManager.GetCommandCharacteristicAsync(savedDevice);
 			Manager.ConnectedDevice = savedDevice;
+			if (commandCharacteristics != null)
+				await commandCharacteristics.StartUpdatesAsync();
+			await SyncTime(savedDevice);
 			await Toast.Make(AppResources.MainPage_DeviceConnected).Show(source.Token);
 		connectReturn:
 			Manager.ReleaseQueue();

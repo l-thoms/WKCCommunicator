@@ -53,12 +53,13 @@ namespace WkcCommunicator.Connections
 
 	public class AdapterManager
 	{
-		public List<WkcDeviceInfo> SavedDevices { get; private set; }
+		public List<WkcDeviceInfo>? SavedDevices { get; private set; }
 		public List<WkcDeviceInfo> ScannedDevices { get; private set; } = new List<WkcDeviceInfo>();
 		public List<WkcDeviceInfo> ScanningDevices { get; private set; } = new List<WkcDeviceInfo>();
 		private WkcDeviceInfo? _connectedDevice;
-		ConcurrentQueue<TaskCompletionSource<bool>> RequestTcs = new ConcurrentQueue<TaskCompletionSource<bool>>();
+		ConcurrentQueue<TaskCompletionSource<bool>> RequestTcs { get; set; } = new ConcurrentQueue<TaskCompletionSource<bool>>();
 		public bool AllowDisconnect { get; set; } = true;
+		private List<TableItemControl> RegisteredControls { get; set; } = new List<TableItemControl>();
 
 		public WkcDeviceInfo? ConnectedDevice
 		{
@@ -67,7 +68,34 @@ namespace WkcCommunicator.Connections
 			{
 				_connectedDevice = value;
 				ConnectedDeviceChanged?.Invoke(this, new EventArgs());
+				Task.Run(async () =>
+				{
+					var characteristic = await GetCommandCharacteristicAsync(value);
+					if (characteristic != null)
+						characteristic.ValueUpdated += CommandCharacteristic_ValueUpdated;
+				});
 			}
+		}
+
+		private async void CommandCharacteristic_ValueUpdated(object? sender, Plugin.BLE.Abstractions.EventArgs.CharacteristicUpdatedEventArgs e)
+		{
+			string itemName;
+			byte[] result = e.Characteristic.Value;
+			if (result.Length < 1 || result[0] != 0x10) return;
+			itemName = Encoding.UTF8.GetString(result.Skip(1).ToArray());
+			Debug.WriteLine($"Request update:\n {itemName}");
+			foreach (var control in RegisteredControls)
+				if (control.Name == itemName)
+				{
+					await control.UpdateAsync();
+				}
+		}
+
+		private void ClearControl()
+		{
+			foreach (var control in RegisteredControls)
+				control.DisconnectHandlers();
+			RegisteredControls.Clear();
 		}
 
 		public event EventHandler? ConnectedDeviceChanged;
@@ -128,7 +156,6 @@ namespace WkcCommunicator.Connections
 				return null;
 			try
 			{
-				await physicalDevice.RequestMtuAsync(240);
 				var services = await physicalDevice.GetServicesAsync();
 				foreach (var s in services)
 				{
@@ -206,7 +233,7 @@ namespace WkcCommunicator.Connections
 			return true;
 		}
 
-		public void ClearRequest()
+		private void ClearRequest()
 		{
 			while (RequestTcs.Count > 0)
 			{
@@ -215,6 +242,7 @@ namespace WkcCommunicator.Connections
 				if (dequeue != null) dequeue.TrySetResult(false);
 				Debug.WriteLine($"Remove Tcs: {RequestTcs.Count}");
 			}
+			ClearControl();
 		}
 
 		public void ReleaseQueue()
@@ -228,7 +256,7 @@ namespace WkcCommunicator.Connections
 			}
 		}
 
-		public async Task<byte[]?> SendCustomCommandAsync(byte[]? command, bool notify = false)
+		public async Task<byte[]?> SendCustomCommandAsync(byte[]? command)
 		{
 			if (ConnectedDevice == null) return null;
 			var commandCharacteristic = await GetCommandCharacteristicAsync(ConnectedDevice);
@@ -236,11 +264,7 @@ namespace WkcCommunicator.Connections
 			{
 				try
 				{
-					if (notify)
-						await commandCharacteristic.StartUpdatesAsync();
 					await commandCharacteristic.WriteAsync(command);
-					if (notify)
-						await commandCharacteristic.StopUpdatesAsync();
 					var result = commandCharacteristic.Value;
 					return result;
 				}
@@ -454,289 +478,26 @@ namespace WkcCommunicator.Connections
 				if (group.Items != null)
 					foreach (var item in group.Items)
 					{
-						if (item.Name == null) continue;
-						Grid itemGrid = new Grid()
+						if (item == null) continue;
+						TableItemControl control = new TableItemControl(this, item, type);
+						if (control.Name != null)
 						{
-							HorizontalOptions = LayoutOptions.Fill
-						};
-						Label displayNameLabel = new Label()
-						{
-							Text = item.DisplayName,
-							HorizontalOptions = LayoutOptions.Start,
-							VerticalOptions = LayoutOptions.Center,
-							FontSize = Convert.ToDouble(new FontSizeConverter().ConvertFromString("Medium")),
-							MaxLines = 1,
-							MinimumWidthRequest = 150,
-						};
-						itemGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-						itemGrid.Add(displayNameLabel);
-						itemGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-						itemGrid.ColumnSpacing = 12;
-						ConcurrentQueue<JsonNode?> transmissionQueue = new ConcurrentQueue<JsonNode?>();
-						bool onTransmit = false;
-						byte[]? generateCommit(JsonNode? data)
-						{
-							if (item.Name == null) return null;
-							JsonObject commandObject = new JsonObject();
-							commandObject.Add(item.Name, data);
-							List<byte> optionCommand = new List<byte>();
-							optionCommand.Add(Convert.ToByte(type == TableGroupType.Shortcut ? CommandType.WriteShortcut : CommandType.WriteSettings));
-							optionCommand.AddRange(Encoding.UTF8.GetBytes(commandObject.ToJsonString()));
-							return optionCommand.ToArray();
+							RegisteredControls.Add(control);
+							groupLayout.Add(control);
 						}
-						async Task commit(JsonNode? data)
+						else
 						{
-							if (item.Name == null) return;
-							bool lastOnTransmit = onTransmit;
-							onTransmit = true;
-							if (lastOnTransmit)
-							{
-								transmissionQueue.Enqueue(data);
-								return;
-							}
-							await RequestQueue();
-							byte[]? generated;
-							generated = generateCommit(data);
-							if (generated != null)
-								await this.SendCustomCommandAsync(generated);
-							while (transmissionQueue.Count != 0)
-							{
-								int tCount = transmissionQueue.Count;
-								JsonNode? outNode = null;
-								for(int i = 0; i < tCount; i++)
-									transmissionQueue.TryDequeue(out outNode);
-								generated = generateCommit(outNode);
-								if (generated != null)
-									await this.SendCustomCommandAsync(generated);
-							}
-							ReleaseQueue();
-							onTransmit = false;
+							control.DisconnectHandlers();
 						}
-						switch (item.Type)
-						{
-							case TableItemType.Action:
-								ScrollView actionScroll = new ScrollView()
-								{
-									Orientation = ScrollOrientation.Horizontal,
-									HorizontalOptions = LayoutOptions.Fill,
-									VerticalOptions = LayoutOptions.Center,
-								};
-								itemGrid.Add(actionScroll);
-								itemGrid.SetColumn(actionScroll, 1);
-								Grid actionGrid = new Grid()
-								{
-									HorizontalOptions = LayoutOptions.Fill,
-									VerticalOptions = LayoutOptions.Fill,
-								};
-								actionScroll.Content = actionGrid;
-								HorizontalStackLayout actionStackLayout = new HorizontalStackLayout()
-								{
-									VerticalOptions = LayoutOptions.Center,
-									HorizontalOptions = LayoutOptions.End,
-									Spacing = 6
-								};
-								async Task updateStackAlignment(ScrollView scrollView, HorizontalStackLayout stackLayout)
-								{
-									double viewportWidth = scrollView.Width;
-									double contentDesiredWidth = stackLayout.DesiredSize.Width;
-
-									if (viewportWidth <= 0)
-										return;
-
-									if (contentDesiredWidth <= viewportWidth)
-									{
-										stackLayout.HorizontalOptions = LayoutOptions.End;
-										scrollView.Orientation = ScrollOrientation.Neither;
-										await scrollView.ScrollToAsync(0, 0, false);
-									}
-									else
-									{
-										stackLayout.HorizontalOptions = LayoutOptions.Start;
-										scrollView.Orientation = ScrollOrientation.Horizontal;
-									}
-								}
-								actionScroll.SizeChanged += async (sender, e) => await updateStackAlignment(actionScroll, actionStackLayout);
-								actionStackLayout.SizeChanged += async (sender, e) => await updateStackAlignment(actionScroll, actionStackLayout);
-								actionGrid.Add(actionStackLayout);
-								if (item.Options != null)
-									for (int i = 0; i < item.Options.Length; i++)
-									{
-										Controls.UnaccentedButton optionButton = new UnaccentedButton()
-										{
-											Text = item.Options[i],
-											MinimumWidthRequest = 60
-										};
-										int optionIndex = i;
-										optionButton.Clicked += async (sender, e) => await commit(optionIndex);
-										actionStackLayout.Add(optionButton);
-									}
-								break;
-							case TableItemType.Switch:
-								Microsoft.Maui.Controls.Switch commandSwitch = new Microsoft.Maui.Controls.Switch();
-								commandSwitch.IsToggled = item.BoolValue;
-								itemGrid.Add(commandSwitch);
-								itemGrid.SetColumn(commandSwitch, 1);
-								commandSwitch.HorizontalOptions = LayoutOptions.End;
-								commandSwitch.Toggled += async (sender, e) => await commit(commandSwitch.IsToggled);
-								break;
-							case TableItemType.Integer:
-							case TableItemType.Decimal:
-								Grid numberGrid = new Grid();
-								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-								numberGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-								numberGrid.ColumnSpacing = 6;
-								Entry numberEntry = new Entry();
-								UnaccentedButton numberUpButton = new UnaccentedButton() { Text = "+"};
-								UnaccentedButton numberDownButton = new UnaccentedButton() { Text = "-" };
-								numberEntry.Keyboard = Keyboard.Numeric;
-								double currentValueDecimal = item.NumberValue;
-								int currentValueInt = Convert.ToInt32(item.NumberValue);
-								numberEntry.Text = item.Type == TableItemType.Decimal ? currentValueDecimal.ToString() : currentValueInt.ToString();
-								numberUpButton.WidthRequest = 24;
-								numberDownButton.WidthRequest = 24;
-								numberEntry.VerticalOptions = LayoutOptions.Center;
-								numberUpButton.VerticalOptions = LayoutOptions.Center;
-								numberDownButton.VerticalOptions = LayoutOptions.Center;
-								bool isValueValid = true;
-								numberEntry.TextChanged += async (sender, e) =>
-								{
-									string originalText = numberEntry.Text;
-									string formattedText = "";
-									bool exceed = true;
-									for (int i = 0; i < originalText.Length; i++)
-									{
-										if (char.IsAsciiDigit(originalText[i]) || originalText[i] == '-' ||
-											originalText[i] == '.' && item.Type == TableItemType.Decimal)
-											formattedText += originalText[i];
-									}
-									try
-									{
-										if (item.Type == TableItemType.Integer)
-										{
-											currentValueInt = Convert.ToInt32(formattedText);
-											if (currentValueInt < Convert.ToInt32(item.Min)) currentValueInt = Convert.ToInt32(item.Min);
-											else if (currentValueInt > Convert.ToInt32(item.Max)) currentValueInt = Convert.ToInt32(item.Max);
-											else exceed = false;
-											if (exceed)
-												formattedText = currentValueInt.ToString();
-										}
-										else
-										{
-											currentValueDecimal = Convert.ToDouble(formattedText);
-											if (currentValueDecimal < item.Min) currentValueDecimal = item.Min;
-											else if (currentValueDecimal > item.Max) currentValueDecimal = item.Max;
-											else exceed = false;
-											if (exceed)
-												formattedText = currentValueDecimal.ToString("0.###");
-										}
-										isValueValid = true;
-									}
-									catch
-									{
-										isValueValid = false;
-									}
-									if (originalText != formattedText)
-									{
-										numberEntry.Text = formattedText;
-										numberEntry.CursorPosition = formattedText.Length;
-									}
-									if (isValueValid)
-										await commit(item.Type == TableItemType.Integer ? currentValueInt : currentValueDecimal);
-								};
-								numberUpButton.Clicked += (sender, e) =>
-								{
-									if (item.Type == TableItemType.Integer)
-									{
-										if (++currentValueInt > Convert.ToInt32(item.Max)) currentValueInt = Convert.ToInt32(item.Max);
-										numberEntry.Text = currentValueInt.ToString();
-									}
-									else
-									{
-										if (++currentValueDecimal > item.Max) currentValueDecimal = item.Max;
-										numberEntry.Text = currentValueDecimal.ToString("0.###");
-									}
-								};
-								numberDownButton.Clicked += (sender, e) =>
-								{
-									if (item.Type == TableItemType.Integer)
-									{
-										if (--currentValueInt < Convert.ToInt32(item.Min)) currentValueInt = Convert.ToInt32(item.Min);
-										numberEntry.Text = currentValueInt.ToString();
-									}
-									else
-									{
-										if (--currentValueDecimal < item.Min) currentValueDecimal = item.Min;
-										numberEntry.Text = currentValueDecimal.ToString("0.###");
-									}
-								};
-								numberGrid.Add(numberEntry);
-								numberGrid.Add(numberUpButton);
-								numberGrid.SetColumn(numberUpButton, 1);
-								numberGrid.Add(numberDownButton);
-								numberGrid.SetColumn(numberDownButton, 2);
-								itemGrid.Add(numberGrid);
-								itemGrid.SetColumn(numberGrid, 1);
-								break;
-							case TableItemType.Picker:
-								UnaccentedButton pickerBackground = new UnaccentedButton();
-								BorderlessPicker picker = new BorderlessPicker();
-								picker.Opacity = 0;
-								pickerBackground.BindingContext = picker;
-								pickerBackground.SetBinding(Button.TextProperty, static (Picker p) => p.SelectedItem);
-								picker.HorizontalTextAlignment = TextAlignment.Center;
-								
-								if (item.Options != null)
-									foreach (var option in item.Options)
-									{
-										picker.Items.Add(option);
-									}
-								picker.SelectedIndex = Convert.ToInt32(item.NumberValue);
-								itemGrid.Add(pickerBackground);
-								itemGrid.Add(picker);
-								itemGrid.SetColumn(picker, 1);
-								itemGrid.SetColumn(pickerBackground, 1);
-								picker.VerticalOptions = LayoutOptions.Center;
-								picker.HorizontalOptions = LayoutOptions.Fill;
-								picker.SelectedIndexChanged += async (sender, e) => await commit(picker.SelectedIndex);
-								break;
-							case TableItemType.String:
-								Entry entry = new Entry();
-								entry.Text = item.StringValue ?? "";
-								itemGrid.Add(entry);
-								itemGrid.SetColumn(entry, 1);
-								entry.VerticalOptions = LayoutOptions.Center;
-								entry.HorizontalOptions = LayoutOptions.Fill;
-								entry.Margin = new Thickness(0, 0, 2, 0);
-								entry.TextChanged += async (sender, e) =>
-								{
-									string formattedText = entry.Text;
-									byte[] utf8_char = Encoding.UTF8.GetBytes(formattedText);
-									int cp = entry.CursorPosition;
-									while (item.StringLength >= 0 && utf8_char.Length > item.StringLength && utf8_char.Length > 0)
-									{
-										if (cp == 0) cp = 1;
-										formattedText = formattedText.Substring(0, cp) + formattedText.Substring(cp + 1, formattedText.Length - cp - 1);
-										if (cp > 0)
-											entry.CursorPosition = cp - 1;
-										utf8_char = Encoding.UTF8.GetBytes(formattedText);
-									}
-									entry.CursorPosition = cp;
-									if (entry.Text != formattedText) entry.Text = formattedText;
-									await commit(formattedText);
-								};
-								break;
-						}
-						groupLayout.Add(itemGrid);
 					}
 				groupBorder.Content = groupLayout;
 				layout.Add(groupBorder);
 			}
 		}
 
-		public async Task DisconnectToDeviceForce(WkcDeviceInfo? deviceInfo, bool connectionLost = false)
+		public async Task DisconnectToDeviceForce(WkcDeviceInfo? deviceInfo, bool connectionLost = false, bool requestQueue = true)
 		{
-			if (!await RequestQueue()) return;
+			if (requestQueue && !await RequestQueue()) return;
 			if (deviceInfo == null || !AllowDisconnect)
 			{
 				ClearRequest();
