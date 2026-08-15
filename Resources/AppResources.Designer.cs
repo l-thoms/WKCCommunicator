@@ -322,6 +322,15 @@ namespace WkcCommunicator.Resources {
         }
         
         /// <summary>
+        ///   查找类似 Device security characteristic does not support update 的本地化字符串。
+        /// </summary>
+        internal static string MainPage_DeviceCommandUpdateNotSupported {
+            get {
+                return ResourceManager.GetString("MainPage_DeviceCommandUpdateNotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Device connected 的本地化字符串。
         /// </summary>
         internal static string MainPage_DeviceConnected {
@@ -336,6 +345,15 @@ namespace WkcCommunicator.Resources {
         internal static string MainPage_DeviceNotVerified {
             get {
                 return ResourceManager.GetString("MainPage_DeviceNotVerified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Device security characteristic does not support update. 的本地化字符串。
+        /// </summary>
+        internal static string MainPage_DeviceSecurityUpdateNotSupported {
+            get {
+                return ResourceManager.GetString("MainPage_DeviceSecurityUpdateNotSupported", resourceCulture);
             }
         }
         

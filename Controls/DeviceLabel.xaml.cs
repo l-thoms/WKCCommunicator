@@ -133,9 +133,9 @@ public partial class DeviceLabel : ContentView
 			SignalBackground.Source = App.Current.PlatformAppTheme == AppTheme.Dark ? "signal_cellular_alt_dark.png" : "signal_cellular_alt.png";
 			if (DeviceInfo.Signal < 10)
 				SignalIndicator.Source = null;
-			else if (DeviceInfo.Signal < 40)
+			else if (DeviceInfo.Signal < 25)
 				SignalIndicator.Source = App.Current.PlatformAppTheme == AppTheme.Dark ? "signal_cellular_alt_1_dark.png" : "signal_cellular_alt_1.png";
-			else if (DeviceInfo.Signal < 70)
+			else if (DeviceInfo.Signal < 40)
 				SignalIndicator.Source = App.Current.PlatformAppTheme == AppTheme.Dark ? "signal_cellular_alt_2_dark.png" : "signal_cellular_alt_2.png";
 			else
 				SignalIndicator.Source = App.Current.PlatformAppTheme == AppTheme.Dark ? "signal_cellular_alt_dark.png" : "signal_cellular_alt.png";
@@ -168,7 +168,7 @@ public partial class DeviceLabel : ContentView
 		if (page != null && DeviceInfo?.Key != "")
 		{
 			if (options.Count > 0)
-				action = await page.DisplayActionSheet(null, cancel, null, options.ToArray());
+				action = await page.DisplayActionSheetAsync(null, cancel, null, options.ToArray());
 			if (IsEnabled)
 			{
 				if (action == deleteDevice)

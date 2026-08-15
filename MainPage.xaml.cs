@@ -399,6 +399,7 @@ namespace WkcCommunicator
 			if (Manager.ConnectedDevice != null)
 			{
 				await Manager.DisconnectToDeviceForce(Manager.ConnectedDevice, requestQueue: false);
+				if (!await Manager.RequestQueue()) return;
 				Manager.ConnectedDevice = null;
 			}
 
@@ -474,7 +475,13 @@ namespace WkcCommunicator
 				verifyMessage.AddRange(Encoding.UTF8.GetBytes(savedDevice.Key));
 			}
 
-			await securityCharacteristic.StartUpdatesAsync();
+			if (securityCharacteristic.CanUpdate)
+				await securityCharacteristic.StartUpdatesAsync();
+			else
+			{
+				await DisconnectNotify(AppResources.MainPage_DeviceSecurityUpdateNotSupported);
+				goto connectReturn;
+			}
 			await securityCharacteristic.WriteAsync(rsaService.Encrypt(verifyMessage.ToArray(), RSAEncryptionPadding.OaepSHA256));
 			if (securityCharacteristic.Value.Length == 0 || securityCharacteristic.Value[0] != 0)
 			{
@@ -493,11 +500,18 @@ namespace WkcCommunicator
 				MyDeviceLayout.Add(deviceLabel);
 			}
 			var commandCharacteristics = await AdapterManager.GetCommandCharacteristicAsync(savedDevice);
-			Manager.ConnectedDevice = savedDevice;
-			if (commandCharacteristics != null)
+			if (commandCharacteristics != null && commandCharacteristics.CanUpdate)
 				await commandCharacteristics.StartUpdatesAsync();
+			else
+			{
+				await DisconnectNotify(AppResources.MainPage_DeviceCommandUpdateNotSupported);
+				goto connectReturn;
+			}
 			await SyncTime(savedDevice);
 			await Toast.Make(AppResources.MainPage_DeviceConnected).Show(source.Token);
+			Manager.ConnectedDevice = savedDevice;
+			MyDeviceLayout.Remove(deviceLabel);
+			MyDeviceLayout.Insert(0, deviceLabel);
 		connectReturn:
 			Manager.ReleaseQueue();
 		}

@@ -249,4 +249,10 @@
   <data name="Table_UnnamedGroup" xml:space="preserve">
     <value>&lt;Unnamed Group&gt;</value>
   </data>
+  <data name="MainPage_DeviceSecurityUpdateNotSupported" xml:space="preserve">
+    <value>Device security characteristic does not support update.</value>
+  </data>
+  <data name="MainPage_DeviceCommandUpdateNotSupported" xml:space="preserve">
+    <value>Device security characteristic does not support update</value>
+  </data>
 </root>

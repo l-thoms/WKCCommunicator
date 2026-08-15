@@ -249,4 +249,10 @@
   <data name="Table_UnnamedGroup" xml:space="preserve">
     <value>&lt;未命名分组&gt;</value>
   </data>
+  <data name="MainPage_DeviceSecurityUpdateNotSupported" xml:space="preserve">
+    <value>验证特征值不支持更新</value>
+  </data>
+  <data name="MainPage_DeviceCommandUpdateNotSupported" xml:space="preserve">
+    <value>命令特征值不支持更新</value>
+  </data>
 </root>
