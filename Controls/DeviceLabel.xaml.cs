@@ -165,7 +165,7 @@ public partial class DeviceLabel : ContentView
 		if (IsConnected) options.Add(disconnect);
 		if (!IsConnected && IsSaved) options.Add(reauthorize);
 		if (IsSaved) options.Add(deleteDevice);
-		if (page != null && DeviceInfo?.Key != "")
+		if (page != null && DeviceInfo?.Key != null)
 		{
 			if (options.Count > 0)
 				action = await page.DisplayActionSheetAsync(null, cancel, null, options.ToArray());

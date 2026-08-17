@@ -457,12 +457,12 @@ namespace WkcCommunicator
 				verifyMessage = new([0]);
 				verifyMessage.AddRange(BitConverter.GetBytes(pairingResult.Key));
 				// Generate a random sequence
-				string randomSequence = "";
+				List<byte> randomSequence = new List<byte>();
 				Random r = new Random();
 				for (int i = 0; i < 16; i++)
-					randomSequence += r.Next(0, 16).ToString("X1");
-				verifyMessage.AddRange(Encoding.UTF8.GetBytes(randomSequence));
-				deviceLabel.DeviceInfo.Key = randomSequence;
+					randomSequence.Add(Convert.ToByte(r.Next(0, 256)));
+				verifyMessage.AddRange(randomSequence);
+				deviceLabel.DeviceInfo.Key = randomSequence.ToArray();
 			}
 			else
 			{
@@ -472,7 +472,7 @@ namespace WkcCommunicator
 					await DisconnectNotify(AppResources.MainPage_DeviceNotVerified);
 					goto connectReturn;
 				}
-				verifyMessage.AddRange(Encoding.UTF8.GetBytes(savedDevice.Key));
+				verifyMessage.AddRange(savedDevice.Key);
 			}
 
 			if (securityCharacteristic.CanUpdate)

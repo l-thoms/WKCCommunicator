@@ -41,7 +41,7 @@ namespace WkcCommunicator.Types
 		public byte[]? ProtocolVersion { get; set; }
 		public string? Model { get; set; }
 		public int Signal { get; set; } = 0;
-		public string? Key { get; set; }
+		public byte[]? Key { get; set; }
 	}
 
 	public class TableItem
