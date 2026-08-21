@@ -489,15 +489,24 @@ namespace WkcCommunicator
 				goto connectReturn;
 			}
 			await securityCharacteristic.StopUpdatesAsync();
-			if (savedDevice != null && reauthorize) savedDevice.Key = deviceLabel.DeviceInfo.Key;
+			if (savedDevice != null && reauthorize)
+			{
+				savedDevice.Key = deviceLabel.DeviceInfo.Key;
+				Manager.SaveDevicePreference();
+			}
 			if (savedDevice == null)
 			{
-				Manager.SavedDevices.Add(deviceLabel.DeviceInfo);
+				Manager.SavedDevices.Insert(0, deviceLabel.DeviceInfo);
 				savedDevice = deviceLabel.DeviceInfo;
 				deviceLabel.IsSaved = true;
 				Manager.SaveDevicePreference();
 				NearbyDeviceLayout.Remove(deviceLabel);
 				MyDeviceLayout.Add(deviceLabel);
+			}
+			else
+			{
+				if (Manager.SavedDevices.Remove(savedDevice))
+					Manager.SavedDevices.Insert(0, savedDevice);
 			}
 			var commandCharacteristics = await AdapterManager.GetCommandCharacteristicAsync(savedDevice);
 			if (commandCharacteristics != null && commandCharacteristics.CanUpdate)
