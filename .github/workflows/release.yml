@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  push-release:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NO_PROGRESS: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+          workloads: maui-android
+
+      - name: Build
+        run: dotnet publish -c Release -f net10.0-android && rm ./bin/Release/net10.0-android/publish/${{ vars.APP_NAME }}-Signed.apk
+
+      - name: Sign APK
+        uses: upup-company/apksigner-android@v1
+        id: sign_app
+        with:
+          releaseDirectory: ./bin/Release/net10.0-android/publish
+          signingKeyBase64: ${{ secrets.KEYSTORE_B64 }}
+          alias: ${{ secrets.KEYSTORE_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_STOREPASS }}
+          keyPassword: ${{ secrets.KEYSTORE_KEYPASS }}
+          customArgs: --v1-signing-enabled,true,--v2-signing-enabled,true,--v3-signing-enabled,true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
+          files: ${{ steps.sign_app.outputs.signedReleaseFile }}
