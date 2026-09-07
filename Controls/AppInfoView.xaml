@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="WkcCommunicator.Controls.AppInfoView"
+			 xmlns:res="clr-namespace:WkcCommunicator.Resources"
+			 xmlns:applicationModel="clr-namespace:Microsoft.Maui.ApplicationModel;assembly=Microsoft.Maui.Essentials">
+	<Grid Padding="24,18,24,18" Background="{AppThemeBinding Light={StaticResource SurfaceLight}, Dark={StaticResource SurfaceDark}}">
+		<VerticalStackLayout Spacing="12">
+			<Label Text="{x:Static res:AppResources.AppInfoView_Title}" FontSize="Large" Margin="0,2,0,0"/>
+			<Grid RowDefinitions="Auto, Auto, Auto" ColumnDefinitions="Auto, *" RowSpacing="6">
+				<Label Style="{StaticResource LabelLighter}" Text="{x:Static res:AppResources.AppInfoView_Version}" Grid.Row="0" Grid.Column="0"/>
+				<Label Style="{StaticResource LabelLighter}" Text="{x:Static applicationModel:AppInfo.VersionString}" Grid.Row="0" Grid.Column="1"/>
+				<Label Style="{StaticResource LabelLighter}" Text="{x:Static res:AppResources.AppInfoView_ProtocolVersion}" Grid.Row="1" Grid.Column="0"/>
+				<Label Style="{StaticResource LabelLighter}" Text="{x:Static res:AppResources.ProtocolVersion}" Grid.Row="1" Grid.Column="1"/>
+				<Label Style="{StaticResource LabelLighter}" Text="{x:Static res:AppResources.AppInfoView_License}" Grid.Row="2" Grid.Column="0"/>
+				<Label Style="{StaticResource LabelLighter}" Text="GNU GPL-3.0 License" Grid.Row="2" Grid.Column="1"/>
+			</Grid>
+			<Grid ColumnDefinitions="*,*">
+				<Button Padding="0" BackgroundColor="Transparent" TextColor="{AppThemeBinding Dark={StaticResource PrimaryDark}, Light={StaticResource Primary}}"
+				Text="{x:Static res:AppResources.AppInfoView_ProjectRepository}" Grid.Row="0" Grid.Column="0" HorizontalOptions="Start" Clicked="ButtonRepo_Clicked"/>
+				<Button Padding="0" BackgroundColor="Transparent" TextColor="{AppThemeBinding Dark={StaticResource PrimaryDark}, Light={StaticResource Primary}}"
+				Text="{x:Static res:AppResources.AppInfoView_OK}" Grid.Row="0" Grid.Column="1" HorizontalOptions="End" Clicked="ButtonOk_Clicked"/>
+			</Grid>
+		</VerticalStackLayout>
+	</Grid>
+</ContentView>

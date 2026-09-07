@@ -255,4 +255,28 @@
   <data name="MainPage_DeviceCommandUpdateNotSupported" xml:space="preserve">
     <value>Device security characteristic does not support update</value>
   </data>
+  <data name="MainPage_SavedDeviceIsNull" xml:space="preserve">
+    <value>Saved Device is null</value>
+  </data>
+  <data name="AppInfoView_Title" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="AppInfoView_Version" xml:space="preserve">
+    <value>Version: </value>
+  </data>
+  <data name="AppInfoView_ProtocolVersion" xml:space="preserve">
+    <value>Protocol Version: </value>
+  </data>
+  <data name="AppInfoView_License" xml:space="preserve">
+    <value>License: </value>
+  </data>
+  <data name="AppInfoView_ProjectRepository" xml:space="preserve">
+    <value>Project Repository</value>
+  </data>
+  <data name="AppInfoView_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="ProtocolVersion" xml:space="preserve">
+    <value>0.2.0.0</value>
+  </data>
 </root>

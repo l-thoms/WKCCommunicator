@@ -6,6 +6,9 @@
     xmlns:local="clr-namespace:WkcCommunicator"
     xmlns:res="clr-namespace:WkcCommunicator.Resources"
     Title="WKC Communicator">
+	<Shell.ToolbarItems>
+		<ToolbarItem IconImageSource="{AppThemeBinding Dark=info_dark.png, Light=info.png}"  Clicked="ToolbarItem_Clicked"/>
+	</Shell.ToolbarItems>
 	<TabBar>
 		<ShellContent
             Title="{x:Static res:AppResources.AppShell_Discovery}"

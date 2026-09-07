@@ -99,7 +99,7 @@ public partial class DeviceLabel : ContentView
 		{
 			LabelProtocolVersion.Text = "";
 			for (int i = 0; i < DeviceInfo.ProtocolVersion.Length; i++)
-				LabelProtocolVersion.Text += $"{(i == 0 ? "v" : ".")}{Convert.ToString(DeviceInfo.ProtocolVersion[i])}";
+				LabelProtocolVersion.Text += $"{(i == 0 ? "" : ".")}{Convert.ToString(DeviceInfo.ProtocolVersion[i])}";
 		}
 
 		if (DeviceInfo.Address != null)

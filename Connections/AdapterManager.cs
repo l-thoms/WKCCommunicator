@@ -11,10 +11,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using WkcCommunicator.Controls;
 using WkcCommunicator.Types;
@@ -59,7 +59,11 @@ namespace WkcCommunicator.Connections
 		private WkcDeviceInfo? _connectedDevice;
 		ConcurrentQueue<TaskCompletionSource<bool>> RequestTcs { get; set; } = new ConcurrentQueue<TaskCompletionSource<bool>>();
 		public bool AllowDisconnect { get; set; } = true;
+		private List<Border> RegisteredGroups { get; set; } = new List<Border>();
 		private List<TableItemControl> RegisteredControls { get; set; } = new List<TableItemControl>();
+		public byte[]? AES { get; set; }
+		public DateTime NotifyTimestamp{ get; set; }
+		public DateTime ValueTimestamp{ get; set; }
 
 		public WkcDeviceInfo? ConnectedDevice
 		{
@@ -80,10 +84,9 @@ namespace WkcCommunicator.Connections
 		private async void CommandCharacteristic_ValueUpdated(object? sender, Plugin.BLE.Abstractions.EventArgs.CharacteristicUpdatedEventArgs e)
 		{
 			string itemName;
-			byte[] result = e.Characteristic.Value;
-			if (result.Length < 1 || result[0] != 0x10) return;
+			byte[]? result = DecodeResult(ConnectedDevice, e.Characteristic.Value, true, false);
+			if (result == null || result.Length < 1 || result[0] != 0x10) return;
 			itemName = Encoding.UTF8.GetString(result.Skip(1).ToArray());
-			Debug.WriteLine($"Request update:\n {itemName}");
 			foreach (var control in RegisteredControls)
 				if (control.Name == itemName)
 				{
@@ -96,6 +99,9 @@ namespace WkcCommunicator.Connections
 			foreach (var control in RegisteredControls)
 				control.DisconnectHandlers();
 			RegisteredControls.Clear();
+			foreach (var group in RegisteredGroups)
+				group.DisconnectHandlers();
+			RegisteredGroups.Clear();
 		}
 
 		public event EventHandler? ConnectedDeviceChanged;
@@ -206,6 +212,33 @@ namespace WkcCommunicator.Connections
 #endif
 		}
 
+		public static DateTime InitTime() => new DateTime(0, DateTimeKind.Local).AddYears(1970);
+
+		public static byte[] GetTimeBytes(DateTime time)
+		{
+			DateTime standardTime = InitTime();
+			TimeSpan timeDiff = time - standardTime;
+			long timeResult = (long)timeDiff.TotalMicroseconds;
+			return [
+				.. BitConverter.GetBytes(timeResult)
+			];
+
+		}
+
+		public static DateTime GetTimeFromBytes(byte[] data)
+		{
+			DateTime result = InitTime();
+			if (data.Length < 8) return result;
+			result = result.AddMicroseconds(BitConverter.ToInt64(data, 0));
+			return result;
+		}
+
+		public static bool IsDeviceLegacy(WkcDeviceInfo ?device)
+		{
+			if (device == null) return false;
+			return device.ProtocolVersion == null || device.ProtocolVersion[0] == 0 && device.ProtocolVersion[1] <= 1;
+		}
+
 		public AdapterManager()
 		{
 			string devicesPreference = Preferences.Get("SavedDevices", "[]");
@@ -264,8 +297,10 @@ namespace WkcCommunicator.Connections
 			{
 				try
 				{
-					await commandCharacteristic.WriteAsync(command);
-					var result = commandCharacteristic.Value;
+					byte[]? commandEncoded = EncodeCommand(command);
+					if (commandEncoded == null) return null;
+					await commandCharacteristic.WriteAsync(commandEncoded);
+					var result = DecodeResult(ConnectedDevice, commandCharacteristic.Value, false, true);
 					return result;
 				}
 				catch
@@ -292,7 +327,8 @@ namespace WkcCommunicator.Connections
 						var result = await commandCharacteristic.ReadAsync();
 						if (result.resultCode == 0)
 						{
-							output = result.data;
+							output = DecodeResult(ConnectedDevice, result.data, false, true);
+							if (output == null) throw new InvalidDataException();
 							outputList.AddRange(output.Skip(1));
 						}
 						else break;
@@ -302,13 +338,15 @@ namespace WkcCommunicator.Connections
 				{
 					if (failedCallback != null)
 						failedCallback();
+					return null;
 				}
 			}
 			return outputList.ToArray();
 		}
 
-		public static TableGroup[]? ParseTableGroups(string tableGroups)
+		public TableGroup[]? ParseTableGroups(string tableGroups)
 		{
+			if (ConnectedDevice == null) return null;
 			JsonNode? node;
 			try
 			{
@@ -326,11 +364,30 @@ namespace WkcCommunicator.Connections
 			{
 				if (group == null) continue;
 				JsonNode? groupNameNode = group["name"];
-				string groupName;
+				JsonNode? groupDisplayNameNode = group["display_name"];
+				string groupName, groupDisplayName;
 				if (groupNameNode == null || groupNameNode.GetValueKind() != JsonValueKind.String)
-					groupName = AppResources.Table_UnnamedGroup;
+				{
+					if (IsDeviceLegacy(ConnectedDevice))
+					{
+						groupName = AppResources.Table_UnnamedGroup;
+						groupDisplayName = groupName;
+					}
+					else continue;
+				}
 				else
+				{
 					groupName = groupNameNode.GetValue<string>();
+					if (IsDeviceLegacy(ConnectedDevice))
+						groupDisplayName = groupName;
+					else
+					{
+						if (groupDisplayNameNode == null || groupDisplayNameNode.GetValueKind() != JsonValueKind.String)
+							groupDisplayName = AppResources.Table_UnnamedGroup;
+						else
+							groupDisplayName = groupDisplayNameNode.GetValue<string>();
+					}
+				}
 				List<TableItem> items = new List<TableItem>();
 				JsonNode? itemsNode = group["items"];
 				JsonArray itemsArray;
@@ -338,7 +395,7 @@ namespace WkcCommunicator.Connections
 					itemsArray = itemsNode.AsArray();
 				else
 				{
-					result.Add(new TableGroup() { Name = groupName, Items = null });
+					result.Add(new TableGroup() { Name = groupName, DisplayName = groupDisplayName, Items = null });
 					continue;
 				}
 
@@ -440,7 +497,7 @@ namespace WkcCommunicator.Connections
 					}
 				}
 
-				result.Add(new TableGroup() { Name = groupName, Items = items.ToArray() });
+				result.Add(new TableGroup() { Name = groupName, DisplayName = groupDisplayName, Items = items.ToArray() });
 			}
 			return result.ToArray();
 		}
@@ -472,7 +529,7 @@ namespace WkcCommunicator.Connections
 				{
 					Margin = new Thickness(4),
 					FontSize = Convert.ToDouble(new FontSizeConverter().ConvertFromString("Large")),
-					Text = group.Name ?? Resources.AppResources.Table_UnnamedGroup
+					Text = group.DisplayName ?? Resources.AppResources.Table_UnnamedGroup,
 				};
 				groupLayout.Add(groupTitle);
 				if (group.Items != null)
@@ -491,6 +548,7 @@ namespace WkcCommunicator.Connections
 						}
 					}
 				groupBorder.Content = groupLayout;
+				RegisteredGroups.Add(groupBorder);
 				layout.Add(groupBorder);
 			}
 		}
@@ -498,55 +556,136 @@ namespace WkcCommunicator.Connections
 		public async Task DisconnectToDeviceForce(WkcDeviceInfo? deviceInfo, bool connectionLost = false, bool requestQueue = true)
 		{
 			if (requestQueue && !await RequestQueue()) return;
-			if (deviceInfo == null || !AllowDisconnect)
+			try
 			{
-				ClearRequest();
-				return;
-			}
-			var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
-			var physicalDevice = GetPhysicalDevice(deviceInfo);
-			if (physicalDevice == null)
-			{
-				ConnectedDevice = null;
-				ClearRequest();
-				return;
-			}
-			if (physicalDevice.State != Plugin.BLE.Abstractions.DeviceState.Disconnected)
-			{
-				try
+				if (deviceInfo == null || !AllowDisconnect)
 				{
-					Debug.WriteLine("Try to disconnect");
-					if (CompareAddress(ConnectedDevice, deviceInfo))
+					return;
+				}
+				var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
+				var physicalDevice = GetPhysicalDevice(deviceInfo);
+				if (physicalDevice == null)
+				{
+					ConnectedDevice = null;
+					return;
+				}
+				if (physicalDevice.State != Plugin.BLE.Abstractions.DeviceState.Disconnected)
+				{
+					try
 					{
-						try
+						Debug.WriteLine("Try to disconnect");
+						if (CompareAddress(ConnectedDevice, deviceInfo))
 						{
-							var characteristic = await GetCommandCharacteristicAsync(ConnectedDevice);
-							if (characteristic != null && characteristic.WriteType == Plugin.BLE.Abstractions.CharacteristicWriteType.WithResponse)
-								await characteristic.StopUpdatesAsync();
+							try
+							{
+								var characteristic = await GetCommandCharacteristicAsync(ConnectedDevice);
+								if (characteristic != null && characteristic.WriteType == Plugin.BLE.Abstractions.CharacteristicWriteType.WithResponse)
+									await characteristic.StopUpdatesAsync();
+							}
+							catch { Debug.WriteLine("Failed to stop update"); }
+							ConnectedDevice = null;
 						}
-						catch { Debug.WriteLine("Failed to stop update"); }
-						ConnectedDevice = null;
+						physicalDevice = GetPhysicalDevice(deviceInfo);
+						if (!connectionLost && physicalDevice != null)
+						{
+							await adapter.DisconnectDeviceAsync(physicalDevice);
+							physicalDevice.Dispose();
+						}
 					}
-					physicalDevice = GetPhysicalDevice(deviceInfo);
-					if (!connectionLost && physicalDevice != null)
+					catch (Exception ex)
 					{
-						await adapter.DisconnectDeviceAsync(physicalDevice);
-						physicalDevice.Dispose();
+						Debug.WriteLine(ex.Message);
 					}
-				}
-				catch (Exception ex)
-				{
-					Debug.WriteLine(ex.Message);
 				}
 			}
-			ClearRequest();
+			finally
+			{
+				ClearRequest();
+				NotifyTimestamp = InitTime();
+				ValueTimestamp = InitTime();
+			}
+		}
+
+		public byte[]? DecodeResult(WkcDeviceInfo? device, byte[]? source, bool appendNotify, bool appendValue)
+		{
+			if (device == null) return null;
+			if (IsDeviceLegacy(device) || source == null) 
+				return source;
+			// Data format: 12-byte IV, AES(Data, Timestamp(microseconds from 1970/1/1)), 16-byte tag
+			if (source.Length <= 36 || AES == null) return null;
+			byte[] iv = source.Take(12).ToArray();
+			byte[] tag = source.TakeLast(16).ToArray();
+			byte[] ciphertext = source.Skip(12).SkipLast(16).ToArray();
+			byte[] result = new byte[ciphertext.Length];
+			using var aes = new AesGcm(AES, 16);
+			try
+			{
+				aes.Decrypt(iv, source.Skip(12).SkipLast(16).ToArray(), tag, result);
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex.Message);
+				return null;
+			}
+			byte[] timestamp = result.TakeLast(8).ToArray();
+			byte[] data = result.SkipLast(8).ToArray();
+			DateTime timestampValue = GetTimeFromBytes(timestamp);
+			bool notifyPass = false, valuePass = false;
+			if (appendNotify)
+			{
+				if (timestampValue > NotifyTimestamp) notifyPass = true;
+			}
+			else
+				notifyPass = true;
+
+			if (appendValue)
+			{
+				if (timestampValue > ValueTimestamp) valuePass = true;
+			}
+			else
+				valuePass = true;
+
+			if (notifyPass && valuePass)
+			{
+				if (appendNotify) NotifyTimestamp = timestampValue;
+				if (appendValue) ValueTimestamp = timestampValue;
+				return data;
+			}
+			else
+			{
+				return null;
+			}
+		}
+
+		public byte[]? EncodeCommand(byte[]? source)
+		{
+			if (source == null || ConnectedDevice == null) return null;
+			bool legacy = IsDeviceLegacy(ConnectedDevice);
+			if (legacy) return source;
+			if (AES == null) return null;
+			using var aes = new AesGcm(AES, 16);
+			byte[] iv = new byte[12];
+			byte[] tag = new byte[16];
+			byte[] plaintext = [.. source, .. GetTimeBytes(DateTime.Now)];
+			byte[] result = new byte[plaintext.Length];
+			RandomNumberGenerator.Fill(iv);
+			aes.Encrypt(iv, plaintext, result, tag);
+			return [.. iv, .. result, .. tag];
+		}
+
+		public bool VerifySecurity(WkcDeviceInfo device, byte[] result)
+		{
+			if (device == null) return false;
+			byte[]? decoded = DecodeResult(device, result, true, true);
+			if (decoded == null || decoded.Length < 1) return false;
+			return decoded[0] == 0;
 		}
 
 		public async Task DeleteDevice(WkcDeviceInfo deviceInfo)
 		{
 			if (!AllowDisconnect) return;
 			await DisconnectToDeviceForce(deviceInfo);
-
+			if (SavedDevices == null) throw new NullReferenceException("SavedDevice is null");
 			for (int i = SavedDevices.Count - 1; i >= 0; i--)
 			{
 				if (CompareAddress(SavedDevices[i], deviceInfo))
@@ -572,39 +711,13 @@ namespace WkcCommunicator.Connections
 		public async Task<(bool Confirmed, int Key)> ShowPairingPopupAsync(Page parent)
 		{
 			var pairingView = new PairingView(parent);
-			Popup popup = new Popup() { Padding = new Thickness(0) };
-			var popupOptions = new PopupOptions();
-			if (popupOptions.Shadow != null)
-			{
-				popupOptions.Shadow.Opacity = 0.25f;
-				popupOptions.Shadow.Offset = new Point(0, 4);
-				popupOptions.Shadow.Radius = 8;
-			}
-			var shape = new Microsoft.Maui.Controls.Shapes.RoundRectangle();
-			shape.CornerRadius = 24;
-			shape.StrokeThickness = 0;
-			popupOptions.Shape = shape;
-			popup.Content = pairingView;
-			await parent.ShowPopupAsync(popup, popupOptions);
+			await App.ShowCommonPopupAsync(parent, pairingView);
 			return (pairingView.Confirmed, pairingView.Key);
 		}
 		public async Task ShowDeletePopupAsync(Page parent, WkcDeviceInfo deviceInfo)
 		{
 			var deleteView = new DeleteView(parent);
-			Popup popup = new Popup() { Padding = new Thickness(0) };
-			var popupOptions = new PopupOptions();
-			if (popupOptions.Shadow != null)
-			{
-				popupOptions.Shadow.Opacity = 0.25f;
-				popupOptions.Shadow.Offset = new Point(0, 4);
-				popupOptions.Shadow.Radius = 8;
-			}
-			var shape = new Microsoft.Maui.Controls.Shapes.RoundRectangle();
-			shape.CornerRadius = 24;
-			shape.StrokeThickness = 0;
-			popup.Content = deleteView;
-			popupOptions.Shape = shape;
-			await parent.ShowPopupAsync(popup, popupOptions);
+			await App.ShowCommonPopupAsync(parent, deleteView);
 			if (deleteView.Confirmed) await DeleteDevice(deviceInfo);
 		}
 	}

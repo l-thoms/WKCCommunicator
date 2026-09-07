@@ -61,6 +61,60 @@ namespace WkcCommunicator.Resources {
         }
         
         /// <summary>
+        ///   查找类似 License:  的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_License {
+            get {
+                return ResourceManager.GetString("AppInfoView_License", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 OK 的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_OK {
+            get {
+                return ResourceManager.GetString("AppInfoView_OK", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Project Repository 的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_ProjectRepository {
+            get {
+                return ResourceManager.GetString("AppInfoView_ProjectRepository", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Protocol Version:  的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_ProtocolVersion {
+            get {
+                return ResourceManager.GetString("AppInfoView_ProtocolVersion", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 About 的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_Title {
+            get {
+                return ResourceManager.GetString("AppInfoView_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Version:  的本地化字符串。
+        /// </summary>
+        internal static string AppInfoView_Version {
+            get {
+                return ResourceManager.GetString("AppInfoView_Version", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Device Settings 的本地化字符串。
         /// </summary>
         internal static string AppShell_DeviceSettings {
@@ -421,6 +475,15 @@ namespace WkcCommunicator.Resources {
         }
         
         /// <summary>
+        ///   查找类似 Saved Device is null 的本地化字符串。
+        /// </summary>
+        internal static string MainPage_SavedDeviceIsNull {
+            get {
+                return ResourceManager.GetString("MainPage_SavedDeviceIsNull", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Keys 的本地化字符串。
         /// </summary>
         internal static string MyDevicePage_Keys {
@@ -444,6 +507,15 @@ namespace WkcCommunicator.Resources {
         internal static string PairingView_InputPassKey {
             get {
                 return ResourceManager.GetString("PairingView_InputPassKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 0.2.0.0 的本地化字符串。
+        /// </summary>
+        internal static string ProtocolVersion {
+            get {
+                return ResourceManager.GetString("ProtocolVersion", resourceCulture);
             }
         }
         

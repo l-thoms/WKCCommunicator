@@ -25,15 +25,15 @@
 							</Grid>
 							<Grid  Grid.Column="0" Grid.Row="1">
 								<controls:UnaccentedButton x:Name="KeyLeftButton" Clicked="KeyButton_Clicked"/>
-								<Image Source="{AppThemeBinding Light=keyboard_arrow_Left.png, Dark=keyboard_arrow_Left_dark.png}" HeightRequest="60"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_left.png, Dark=keyboard_arrow_left_dark.png}" HeightRequest="60"/>
 							</Grid>
 							<Grid  Grid.Column="2" Grid.Row="1">
 								<controls:UnaccentedButton x:Name="KeyRightButton" Clicked="KeyButton_Clicked"/>
-								<Image Source="{AppThemeBinding Light=keyboard_arrow_right.png, Dark=keyboard_arrow_up_right_dark.png}" HeightRequest="60"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_right.png, Dark=keyboard_arrow_right_dark.png}" HeightRequest="60"/>
 							</Grid>
 							<Grid  Grid.Column="1" Grid.Row="2">
 								<controls:UnaccentedButton x:Name="KeyDownButton" Clicked="KeyButton_Clicked"/>
-								<Image Source="{AppThemeBinding Light=keyboard_arrow_down.png, Dark=keyboard_arrow_up_down_dark.png}" HeightRequest="60"/>
+								<Image Source="{AppThemeBinding Light=keyboard_arrow_down.png, Dark=keyboard_arrow_down_dark.png}" HeightRequest="60"/>
 							</Grid>
 
 

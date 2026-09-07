@@ -48,6 +48,7 @@ namespace WkcCommunicator
 
 		private void ListSavedDevices()
 		{
+			if (Manager.SavedDevices == null) throw new NullReferenceException("SavedDevice is null");
 			// Remove label
 			for (int i = MyDeviceLayout.Count - 1; i >= 0; i--)
 			{
@@ -229,6 +230,7 @@ namespace WkcCommunicator
 			// Update UI
 			bool isDeviceSaved = false;
 			DeviceLabel? deviceLabel = null;
+			if (Manager.SavedDevices == null) throw new NullReferenceException("SavedDevice is null");
 			foreach (var saved in Manager.SavedDevices)
 				if (AdapterManager.CompareAddress(saved, deviceInfo))
 				{
@@ -377,152 +379,208 @@ namespace WkcCommunicator
 			catch{; }
 		}
 
-		private async Task ConnectDeviceByLabel(DeviceLabel deviceLabel, bool reauthorize = false)
+		private async Task<(byte[]? Result, byte[]? AES, DateTime Timestamp)> GenerateVerifyMessageAsync(DeviceLabel deviceLabel, WkcDeviceInfo? savedDevice, bool reauthorize, byte[] publicKey)
 		{
-			if (!await Manager.RequestQueue()) return;
-			using var rsaService = RSA.Create();
-			using var source = new CancellationTokenSource();
-			if (deviceLabel == null) goto connectReturn;
-			if (deviceLabel.DeviceInfo == null) goto connectReturn;
-			if(AdapterManager.GetPhysicalDevice(deviceLabel.DeviceInfo) != null) goto connectReturn;
-			var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
-			async Task DisconnectNotify(string? notification)
-			{
-				await Manager.DisconnectToDeviceForce(deviceLabel.DeviceInfo, requestQueue: false);
-				if (notification != null)
-				{
-					using var source = new CancellationTokenSource();
-					await Toast.Make(notification).Show(source.Token);
-				}
-			}
-			// Disconnect pervious device
-			if (Manager.ConnectedDevice != null)
-			{
-				await Manager.DisconnectToDeviceForce(Manager.ConnectedDevice, requestQueue: false);
-				if (!await Manager.RequestQueue()) return;
-				Manager.ConnectedDevice = null;
-			}
-
-			// Check if the device is saved
-			WkcDeviceInfo? savedDevice = null;
-			foreach (var d in Manager.SavedDevices)
-			{
-				if (AdapterManager.CompareAddress(d, deviceLabel.DeviceInfo))
-				{
-					savedDevice = d;
-					break;
-				}
-			}
-
-			// Connect to the device first
-			IDevice currentDevice;
-			byte[]? publicKey = null;
-			ICharacteristic? securityCharacteristic;
-			try
-			{
-				currentDevice = await adapter.ConnectToKnownDeviceAsync(AddressToGuid(deviceLabel.DeviceInfo.Address));
-				await currentDevice.RequestMtuAsync(240);
-				// Grab public key
-				securityCharacteristic = await AdapterManager.GetSecurityCharacteristicAsync(currentDevice);
-				if (securityCharacteristic == null)
-				{
-					await DisconnectNotify(AppResources.MainPage_FailedToReadCharacteristicsForVerification);
-					goto connectReturn;
-				}
-				var readResult = await securityCharacteristic.ReadAsync();
-				publicKey = readResult.data;
-				if (publicKey == null)
-				{
-					await DisconnectNotify(AppResources.MainPage_FailedToReadVerificationData);
-					goto connectReturn;
-				}
-			}
-			catch
-			{
-				await DisconnectNotify(AppResources.MainPage_FailedToConnectDevice);
-				goto connectReturn;
-			}
-
-			rsaService.ImportRSAPublicKey(publicKey, out _);
-			List<byte> verifyMessage;
-
+			var deviceInfo = deviceLabel.DeviceInfo;
+			if (deviceInfo == null)
+				return (null, null, DateTime.Now);
+			List<byte> verifyMessage = new List<byte>();
+			DateTime timestamp;
+			byte[] aes = new byte[32];
+			RandomNumberGenerator.Fill(aes);
+			bool legacy = AdapterManager.IsDeviceLegacy(deviceInfo);
 			if (savedDevice == null || reauthorize)
 			{
 				var pairingResult = await Manager.ShowPairingPopupAsync(this);
 				if (!pairingResult.Confirmed)
+					return (null, null, DateTime.Now);
+				timestamp = DateTime.Now;
+				verifyMessage.Add(0);
+				byte[] randomSequence = new byte[16];
+				RandomNumberGenerator.Fill(randomSequence);
+				deviceInfo.Key = randomSequence;
+				if (legacy)
 				{
-					await DisconnectNotify(null);
-					goto connectReturn;
+					verifyMessage.AddRange(BitConverter.GetBytes(pairingResult.Key));
+					verifyMessage.AddRange(randomSequence);
 				}
-				verifyMessage = new([0]);
-				verifyMessage.AddRange(BitConverter.GetBytes(pairingResult.Key));
-				// Generate a random sequence
-				List<byte> randomSequence = new List<byte>();
-				Random r = new Random();
-				for (int i = 0; i < 16; i++)
-					randomSequence.Add(Convert.ToByte(r.Next(0, 256)));
-				verifyMessage.AddRange(randomSequence);
-				deviceLabel.DeviceInfo.Key = randomSequence.ToArray();
+				else // RSA(0x00, SHA(SHA(Public Key), SHA(Pairing Code)), Trust Key, Temporary AES, Timestamp)
+				{
+					byte[] hash = SHA256.HashData([
+						.. SHA256.HashData(publicKey), 
+						.. SHA256.HashData(BitConverter.GetBytes(pairingResult.Key))]);
+					verifyMessage.AddRange(hash);
+					verifyMessage.AddRange(randomSequence);
+					verifyMessage.AddRange(aes);
+					verifyMessage.AddRange(AdapterManager.GetTimeBytes(timestamp));
+				}
 			}
 			else
 			{
-				verifyMessage = new([1]);
 				if (savedDevice == null || savedDevice.Key == null)
+					return (null, null, DateTime.Now);
+				verifyMessage.Add(1);
+				timestamp = DateTime.Now;
+				if (legacy)
 				{
-					await DisconnectNotify(AppResources.MainPage_DeviceNotVerified);
-					goto connectReturn;
+					verifyMessage.AddRange(savedDevice.Key);
 				}
-				verifyMessage.AddRange(savedDevice.Key);
+				else // RSA(0x01, SHA(SHA(Public Key), SHA(Trust Key)), Temporary AES, Timestamp)
+				{
+					byte[] hash = SHA256.HashData([
+						.. SHA256.HashData(publicKey), 
+						.. SHA256.HashData(savedDevice.Key)]);
+					verifyMessage.AddRange(hash);
+					verifyMessage.AddRange(aes);
+					verifyMessage.AddRange(AdapterManager.GetTimeBytes(timestamp));
+				}
 			}
 
-			if (securityCharacteristic.CanUpdate)
-				await securityCharacteristic.StartUpdatesAsync();
-			else
+			return (verifyMessage.ToArray(), aes, timestamp);
+		}
+
+		private async Task ConnectDeviceByLabel(DeviceLabel deviceLabel, bool reauthorize = false)
+		{
+			if (!await Manager.RequestQueue()) return;
+			try
 			{
-				await DisconnectNotify(AppResources.MainPage_DeviceSecurityUpdateNotSupported);
-				goto connectReturn;
+				using var rsaService = RSA.Create();
+				using var source = new CancellationTokenSource();
+				if (deviceLabel == null) return;
+				if (deviceLabel.DeviceInfo == null) return;
+				if (AdapterManager.GetPhysicalDevice(deviceLabel.DeviceInfo) != null) return;
+				var adapter = Plugin.BLE.CrossBluetoothLE.Current.Adapter;
+				async Task DisconnectNotify(string? notification)
+				{
+					await Manager.DisconnectToDeviceForce(deviceLabel.DeviceInfo, requestQueue: false);
+					if (notification != null)
+					{
+						using var source = new CancellationTokenSource();
+						await Toast.Make(notification).Show(source.Token);
+					}
+				}
+				// Disconnect pervious device
+				if (Manager.ConnectedDevice != null)
+				{
+					await Manager.DisconnectToDeviceForce(Manager.ConnectedDevice, requestQueue: false);
+					if (!await Manager.RequestQueue()) return;
+					Manager.ConnectedDevice = null;
+				}
+
+				// Check if the device is saved
+				WkcDeviceInfo? savedDevice = null;
+				if (Manager.SavedDevices == null)
+				{
+					await DisconnectNotify(AppResources.MainPage_FailedToReadVerificationData);
+					return;
+				}
+				else
+				{
+					foreach (var d in Manager.SavedDevices)
+					{
+						if (AdapterManager.CompareAddress(d, deviceLabel.DeviceInfo))
+						{
+							savedDevice = d;
+							break;
+						}
+					}
+				}
+
+				// Connect to the device first
+				IDevice currentDevice;
+				byte[]? publicKey = null;
+				ICharacteristic? securityCharacteristic;
+				try
+				{
+					currentDevice = await adapter.ConnectToKnownDeviceAsync(AddressToGuid(deviceLabel.DeviceInfo.Address));
+					await currentDevice.RequestMtuAsync(240);
+					// Grab public key
+					securityCharacteristic = await AdapterManager.GetSecurityCharacteristicAsync(currentDevice);
+					if (securityCharacteristic == null)
+					{
+						await DisconnectNotify(AppResources.MainPage_FailedToReadCharacteristicsForVerification);
+						return;
+					}
+					var readResult = await securityCharacteristic.ReadAsync();
+					publicKey = readResult.data;
+					if (publicKey == null)
+					{
+						await DisconnectNotify(AppResources.MainPage_FailedToReadVerificationData);
+						return;
+					}
+				}
+				catch
+				{
+					await DisconnectNotify(AppResources.MainPage_FailedToConnectDevice);
+					return;
+				}
+
+				rsaService.ImportRSAPublicKey(publicKey, out _);
+
+				if (securityCharacteristic.CanUpdate)
+					await securityCharacteristic.StartUpdatesAsync();
+				else
+				{
+					await DisconnectNotify(AppResources.MainPage_DeviceSecurityUpdateNotSupported);
+					return;
+				}
+
+				var generatedMessage = await GenerateVerifyMessageAsync(deviceLabel, savedDevice, reauthorize, publicKey);
+				if (generatedMessage.Result == null)
+				{
+					await DisconnectNotify(null);
+					return;
+				}
+				Manager.AES = generatedMessage.AES;
+				Manager.NotifyTimestamp = AdapterManager.InitTime();
+				Manager.ValueTimestamp = AdapterManager.InitTime();
+
+				await securityCharacteristic.WriteAsync(rsaService.Encrypt(generatedMessage.Result, RSAEncryptionPadding.OaepSHA256));
+				if (!Manager.VerifySecurity(deviceLabel.DeviceInfo, securityCharacteristic.Value))
+				{
+					await DisconnectNotify(AppResources.MainPage_FailedToVerify);
+					return;
+				}
+				await securityCharacteristic.StopUpdatesAsync();
+				if (savedDevice != null && reauthorize)
+				{
+					savedDevice.Key = deviceLabel.DeviceInfo.Key;
+					Manager.SaveDevicePreference();
+				}
+				if (savedDevice == null)
+				{
+					Manager.SavedDevices.Insert(0, deviceLabel.DeviceInfo);
+					savedDevice = deviceLabel.DeviceInfo;
+					deviceLabel.IsSaved = true;
+					Manager.SaveDevicePreference();
+					NearbyDeviceLayout.Remove(deviceLabel);
+					MyDeviceLayout.Add(deviceLabel);
+				}
+				else
+				{
+					if (Manager.SavedDevices.Remove(savedDevice))
+						Manager.SavedDevices.Insert(0, savedDevice);
+				}
+				var commandCharacteristics = await AdapterManager.GetCommandCharacteristicAsync(savedDevice);
+				if (commandCharacteristics != null && commandCharacteristics.CanUpdate)
+					await commandCharacteristics.StartUpdatesAsync();
+				else
+				{
+					await DisconnectNotify(AppResources.MainPage_DeviceCommandUpdateNotSupported);
+					return;
+				}
+				// Time sync via command characteristic is deprecated above v0.2+
+				if (AdapterManager.IsDeviceLegacy(savedDevice))
+					await SyncTime(savedDevice);
+				await Toast.Make(AppResources.MainPage_DeviceConnected).Show(source.Token);
+				Manager.ConnectedDevice = savedDevice;
+				MyDeviceLayout.Remove(deviceLabel);
+				MyDeviceLayout.Insert(0, deviceLabel);
 			}
-			await securityCharacteristic.WriteAsync(rsaService.Encrypt(verifyMessage.ToArray(), RSAEncryptionPadding.OaepSHA256));
-			if (securityCharacteristic.Value.Length == 0 || securityCharacteristic.Value[0] != 0)
+			finally
 			{
-				await DisconnectNotify(AppResources.MainPage_FailedToVerify);
-				goto connectReturn;
+				Manager.ReleaseQueue();
 			}
-			await securityCharacteristic.StopUpdatesAsync();
-			if (savedDevice != null && reauthorize)
-			{
-				savedDevice.Key = deviceLabel.DeviceInfo.Key;
-				Manager.SaveDevicePreference();
-			}
-			if (savedDevice == null)
-			{
-				Manager.SavedDevices.Insert(0, deviceLabel.DeviceInfo);
-				savedDevice = deviceLabel.DeviceInfo;
-				deviceLabel.IsSaved = true;
-				Manager.SaveDevicePreference();
-				NearbyDeviceLayout.Remove(deviceLabel);
-				MyDeviceLayout.Add(deviceLabel);
-			}
-			else
-			{
-				if (Manager.SavedDevices.Remove(savedDevice))
-					Manager.SavedDevices.Insert(0, savedDevice);
-			}
-			var commandCharacteristics = await AdapterManager.GetCommandCharacteristicAsync(savedDevice);
-			if (commandCharacteristics != null && commandCharacteristics.CanUpdate)
-				await commandCharacteristics.StartUpdatesAsync();
-			else
-			{
-				await DisconnectNotify(AppResources.MainPage_DeviceCommandUpdateNotSupported);
-				goto connectReturn;
-			}
-			await SyncTime(savedDevice);
-			await Toast.Make(AppResources.MainPage_DeviceConnected).Show(source.Token);
-			Manager.ConnectedDevice = savedDevice;
-			MyDeviceLayout.Remove(deviceLabel);
-			MyDeviceLayout.Insert(0, deviceLabel);
-		connectReturn:
-			Manager.ReleaseQueue();
 		}
 
 		private void Adapter_ScanTimeoutElapsed(object? sender, EventArgs e)

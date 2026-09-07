@@ -49,7 +49,7 @@ public partial class DeviceSettingsPage : ContentPage
 					Manager.ReleaseQueue();
 					if (fetchResult == null) return;
 					string fetchString = Encoding.UTF8.GetString(fetchResult);
-					TableGroup[]? groups = AdapterManager.ParseTableGroups(fetchString);
+					TableGroup[]? groups = Manager.ParseTableGroups(fetchString);
 					if (groups is null) return;
 					Manager.InsetTableToLayout(groups, SettingsTableLayout, TableGroupType.Settings);
 				}

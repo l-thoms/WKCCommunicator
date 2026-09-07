@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿using WkcCommunicator.Controls;
 
 namespace WkcCommunicator
 {
@@ -7,6 +7,11 @@ namespace WkcCommunicator
         public AppShell()
         {
             InitializeComponent();
+        }
+
+		private async void ToolbarItem_Clicked(object sender, EventArgs e)
+		{
+            await AppInfoView.ShowAppInfo(this.CurrentPage);
         }
     }
 }

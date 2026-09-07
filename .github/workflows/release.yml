@@ -31,10 +31,12 @@ jobs:
           workloads: maui-android
 
       - name: Build
-        run: dotnet publish -c Release -f net10.0-android && rm ./bin/Release/net10.0-android/publish/${{ vars.APP_NAME }}-Signed.apk
+        run: |
+          dotnet publish -c Release -f net10.0-android
+          rm ./bin/Release/net10.0-android/publish/${{ vars.APP_NAME }}-Signed.apk
 
       - name: Sign APK
-        uses: upup-company/apksigner-android@v1
+        uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
           releaseDirectory: ./bin/Release/net10.0-android/publish
@@ -42,7 +44,8 @@ jobs:
           alias: ${{ secrets.KEYSTORE_ALIAS }}
           keyStorePassword: ${{ secrets.KEYSTORE_STOREPASS }}
           keyPassword: ${{ secrets.KEYSTORE_KEYPASS }}
-          customArgs: --v1-signing-enabled,true,--v2-signing-enabled,true,--v3-signing-enabled,true
+        env:
+           BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

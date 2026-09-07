@@ -11,7 +11,7 @@ namespace WkcCommunicator.Types
 	{
 		None,
 		KeyCode,
-		TimeSync,
+		TimeSync, // Deprecated in v0.2+
 		ReadShortcutTable,
 		ReadShortcutItem,
 		WriteShortcut,
@@ -61,6 +61,7 @@ namespace WkcCommunicator.Types
 	public class TableGroup
 	{
 		public string? Name { get; set; }
+		public string? DisplayName { get; set; }
 		public TableItem[]? Items { get; set; }
 	}
 
